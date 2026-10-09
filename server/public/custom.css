@@ -1,0 +1,44 @@
+/* Цвет верхней панели */
+.swagger-ui .topbar {
+  background-color: #161616 !important;
+  border-bottom: 3px solid #962020;
+  padding: 10px 0;
+}
+
+/* Скрываем стандартную иконку/логотип Swagger */
+.swagger-ui .topbar-wrapper a img,
+.swagger-ui .topbar-wrapper a svg {
+  display: none !important;
+}
+
+/* Вставляем твой logo.png перед текстом */
+.swagger-ui .topbar-wrapper a::before {
+  content: '';
+  display: inline-block;
+  width: 55px;
+  height: 60px;
+  background-image: url('/public/logo.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  vertical-align: middle;
+  margin-right: 12px;
+}
+
+/* Текст рядом с логотипом */
+.swagger-ui .topbar-wrapper a::after {
+  content: 'Vector';
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 22px;
+  font-family: 'Segoe UI', sans-serif;
+  vertical-align: middle;
+}
+
+/* Дополнительные стили для кнопок */
+.swagger-ui .btn.authorize {
+  background-color: #ffffff !important;
+  color: #791f1f !important;
+  border-color: #ffffff !important;
+  font-weight: bold;
+}
