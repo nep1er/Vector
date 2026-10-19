@@ -3,6 +3,7 @@ import { RoadmapRepository } from '../db/RoadmapRepository.js';
 import { TodoRepository } from '../db/TodoRepository.js';
 import { TaskRepository } from '../db/TaskRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { checkProjectAccess, checkTaskAccess } from '../middleware/rbacMiddleware.js';
 import { sendError } from '../utils/httpError.js';
 
 const router = Router();
@@ -57,7 +58,7 @@ const router = Router();
  *       404:
  *         description: Проект или родитель не найден
  */
-router.post('/projects/:projectId/roadmap', authMiddleware, async (req, res) => {
+router.post('/projects/:projectId/roadmap', authMiddleware, checkProjectAccess('EXECUTE'), async (req, res) => {
   try {
     const { projectId } = req.params;
     const { title, startDate, endDate, parentRoadmapId } = req.body;
@@ -100,15 +101,21 @@ router.post('/projects/:projectId/roadmap', authMiddleware, async (req, res) => 
  *                 type: integer
  *                 description: Если не указан — задача попадёт в корневую RoadMap
  *                 example: 1
+ *               startDate:
+ *                 type: string
+ *                 example: "2026-02-01T00:00:00.000Z"
+ *               endDate:
+ *                 type: string
+ *                 example: "2026-02-14T23:59:59.000Z"
  *     responses:
  *       201:
  *         description: Задача ToDo создана
  */
-router.post('/projects/:projectId/todo', authMiddleware, async (req, res) => {
+router.post('/projects/:projectId/todo', authMiddleware, checkProjectAccess('WRITE'), async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { title, parentRoadmapId } = req.body;
-    const todo = await TodoRepository.createTodoTask(projectId, title, parentRoadmapId);
+    const { title, parentRoadmapId, startDate, endDate } = req.body;
+    const todo = await TodoRepository.createTodoTask(projectId, title, parentRoadmapId, startDate, endDate);
     res.status(201).json(todo);
   } catch (error) {
     sendError(res, error, 'Ошибка создания ToDo задачи');
@@ -133,7 +140,7 @@ router.post('/projects/:projectId/todo', authMiddleware, async (req, res) => {
  *       200:
  *         description: Иерархическое дерево задач
  */
-router.get('/projects/:projectId/tree', authMiddleware, async (req, res) => {
+router.get('/projects/:projectId/tree', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
   try {
     const tree = await TaskRepository.getProjectTree(req.params.projectId);
     res.json(tree);
@@ -164,7 +171,7 @@ router.get('/projects/:projectId/tree', authMiddleware, async (req, res) => {
  *       404:
  *         description: Задача не найдена
  */
-router.delete('/:taskId', authMiddleware, async (req, res) => {
+router.delete('/:taskId', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
   try {
     const deleted = await TaskRepository.deleteTask(req.params.taskId);
     if (!deleted) {
@@ -202,7 +209,7 @@ router.delete('/:taskId', authMiddleware, async (req, res) => {
  *       200: { description: Название изменено }
  *       404: { description: Задача не найдена }
  */
-router.patch('/:taskId/title', authMiddleware, async (req, res) => {
+router.patch('/:taskId/title', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
   try {
     const updated = await TaskRepository.updateTaskTitle(req.params.taskId, req.body.title);
     if (!updated) return res.status(404).json({ message: 'Задача не найдена' });
@@ -239,7 +246,7 @@ router.patch('/:taskId/title', authMiddleware, async (req, res) => {
  *       200: { description: Название субтипа изменено }
  *       404: { description: Задача не найдена }
  */
-router.patch('/:taskId/subtype-title', authMiddleware, async (req, res) => {
+router.patch('/:taskId/subtype-title', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
   try {
     const { type, title } = req.body;
     const updated = await TaskRepository.updateSubtypeTitle(req.params.taskId, type, title);
@@ -276,7 +283,7 @@ router.patch('/:taskId/subtype-title', authMiddleware, async (req, res) => {
  *       400: { description: Даты нарушают границы иерархии }
  *       404: { description: Задача не найдена }
  */
-router.patch('/:taskId/dates', authMiddleware, async (req, res) => {
+router.patch('/:taskId/dates', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
     const updated = await TaskRepository.updateTaskDates(req.params.taskId, startDate, endDate);

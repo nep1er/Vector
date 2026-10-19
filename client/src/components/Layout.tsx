@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { LogoMark } from './Avatar';
 import Icon from './Icon';
+import Logo from './Logo';
 import Sidebar from './Sidebar';
 
 export default function Layout() {
@@ -17,8 +17,7 @@ export default function Layout() {
         <button className="icon-btn" onClick={() => setOpen(true)} aria-label="Открыть меню">
           <Icon name="menu" />
         </button>
-        <LogoMark size={24} />
-        <span>Vector</span>
+        <Logo height={24} />
       </header>
 
       {open && <div className="scrim" onClick={() => setOpen(false)} />}

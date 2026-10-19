@@ -6,7 +6,7 @@
 |---|---|
 | `design/tokens.json` | **Источник правды**: цвета, радиусы, отступы, шрифт, тени, градиенты проектов. Его читают Desktop и Mobile. |
 | `design/tokens.css` | Переменные для Web. Генерируется: `node resources/design/build-tokens.mjs` |
-| `brand/` | Логотип и favicon |
+| `brand/` | `logo.png` — основной логотип (заменяется своим файлом с тем же именем), favicon |
 | `icons/` | Иконки 24×24, `stroke="currentColor"` — цвет задаётся цветом текста |
 
 Правила:

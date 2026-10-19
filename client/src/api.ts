@@ -9,6 +9,7 @@ import type {
   AuthResponse,
   KanbanColumn,
   Project,
+  ProjectDetails,
   ProjectRole,
   ProjectTag,
   Task,
@@ -128,6 +129,8 @@ const auth = {
 const projects = {
   list: () => request<Project[]>('GET', '/api/projects'),
 
+  get: (projectId: number) => request<ProjectDetails>('GET', `/api/projects/${projectId}`),
+
   create: (title: string, description?: string) =>
     request<Project>('POST', '/api/projects', { title, description }),
 
@@ -156,8 +159,19 @@ const tasks = {
     data: { title: string; startDate?: string; endDate?: string; parentRoadmapId?: number | null },
   ) => request<Task>('POST', `/api/tasks/projects/${projectId}/roadmap`, data),
 
-  createTodo: (projectId: number, title: string, parentRoadmapId: number) =>
-    request<Task>('POST', `/api/tasks/projects/${projectId}/todo`, { title, parentRoadmapId }),
+  createTodo: (
+    projectId: number,
+    title: string,
+    parentRoadmapId: number,
+    startDate?: string,
+    endDate?: string,
+  ) =>
+    request<Task>('POST', `/api/tasks/projects/${projectId}/todo`, {
+      title,
+      parentRoadmapId,
+      startDate,
+      endDate,
+    }),
 
   remove: (taskId: number) => request<{ message: string }>('DELETE', `/api/tasks/${taskId}`),
 

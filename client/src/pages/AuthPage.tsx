@@ -2,9 +2,15 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { LogoMark } from '../components/Avatar';
+import Logo from '../components/Logo';
 
-const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+// Декоративная мини-шкала: [отступ %, ширина %, тип]
+const BARS: [number, number, 'a' | 'b'][] = [
+  [0, 38, 'a'],
+  [30, 42, 'b'],
+  [12, 30, 'b'],
+  [52, 40, 'a'],
+];
 
 export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const isLogin = mode === 'login';
@@ -41,25 +47,23 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   return (
     <div className="auth">
       <aside className="auth-aside">
-        <div className="brand brand-light">
-          <LogoMark size={34} />
-          <span>Vector</span>
-        </div>
+        <Logo height={40} />
 
         <div>
-          <h1 className="auth-headline">Год в плане, неделя на доске</h1>
+          <h1 className="auth-headline">Планы на любой срок, работа — на доске</h1>
           <p className="auth-lead">
-            Стратегия по месяцам и привычные канбан-доски для текущей работы — в одном месте.
+            Дорожная карта без ограничений по времени и привычные канбан-доски для текущих задач —
+            в одном месте.
           </p>
         </div>
 
-        <ol className="year-strip" aria-hidden="true">
-          {MONTHS.map((m, i) => (
-            <li key={m} className={i === 9 ? 'now' : undefined}>
-              {m}
-            </li>
+        <div className="mini-timeline" aria-hidden="true">
+          {BARS.map(([left, width, kind], i) => (
+            <div className="mini-row" key={i}>
+              <span className={`mini-bar mini-${kind}`} style={{ left: `${left}%`, width: `${width}%` }} />
+            </div>
           ))}
-        </ol>
+        </div>
       </aside>
 
       <main className="auth-main">

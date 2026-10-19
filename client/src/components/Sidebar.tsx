@@ -1,27 +1,34 @@
-import { NavLink } from 'react-router-dom';
-import { LogoMark } from './Avatar';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import Icon from './Icon';
+import Logo from './Logo';
 import UserMenu from './UserMenu';
 
 export default function Sidebar({ open }: { open: boolean }) {
+  const { pathname } = useLocation();
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'side-link active' : 'side-link';
 
+  // «Проекты» подсвечены и на главной, и внутри любого проекта
+  const projectsActive = pathname === '/' || pathname.startsWith('/projects');
+
   return (
     <aside className={open ? 'sidebar open' : 'sidebar'}>
-      <div className="sidebar-brand">
-        <LogoMark size={30} />
-        <span>Vector</span>
-      </div>
+      <Link to="/" className="sidebar-brand" aria-label="Vector">
+        <Logo height={32} />
+      </Link>
 
       <nav className="side-nav" aria-label="Основная навигация">
-        <NavLink to="/" end className={linkClass}>
+        <Link to="/" className={projectsActive ? 'side-link active' : 'side-link'}>
           <Icon name="folder" />
           Проекты
-        </NavLink>
+        </Link>
         <NavLink to="/tasks" className={linkClass}>
           <Icon name="tasks" />
           Задачи
+        </NavLink>
+        <NavLink to="/notifications" className={linkClass}>
+          <Icon name="bell" />
+          Уведомления
         </NavLink>
       </nav>
 

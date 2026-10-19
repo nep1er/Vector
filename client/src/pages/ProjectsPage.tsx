@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import CreateProjectModal from '../components/CreateProjectModal';
 import Icon from '../components/Icon';
@@ -7,6 +8,7 @@ import type { Project } from '../types';
 const GRADIENTS = 6;
 
 export default function ProjectsPage() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,9 +30,10 @@ export default function ProjectsPage() {
     load();
   }, [load]);
 
+  // После создания сразу открываем главную RoadMap нового проекта
   const handleCreated = (project: Project) => {
-    setProjects((prev) => [project, ...prev]);
     setShowCreate(false);
+    navigate(`/projects/${project.id}`);
   };
 
   return (
@@ -59,24 +62,27 @@ export default function ProjectsPage() {
           ))}
         </ul>
       ) : (
-        !error && (
+        !error &&
+        (projects.length === 0 ? (
+          <div className="empty">
+            <Icon name="folder" size={32} />
+            <h2>Проектов пока нет</h2>
+          </div>
+        ) : (
           <ul className="tiles">
             {projects.map((p) => (
-              <li key={p.id} className="tile" title={p.description ?? undefined}>
-                <div
-                  className="tile-cover"
-                  style={{ background: `var(--gradient-project-${(p.id % GRADIENTS) + 1})` }}
-                />
-                <div className="tile-title">{p.title}</div>
+              <li key={p.id}>
+                <Link to={`/projects/${p.id}`} className="tile" title={p.description ?? undefined}>
+                  <div
+                    className="tile-cover"
+                    style={{ background: `var(--gradient-project-${(p.id % GRADIENTS) + 1})` }}
+                  />
+                  <div className="tile-title">{p.title}</div>
+                </Link>
               </li>
             ))}
-            <li>
-              <button className="tile tile-create" onClick={() => setShowCreate(true)}>
-                Создать проект
-              </button>
-            </li>
           </ul>
-        )
+        ))
       )}
 
       {showCreate && (

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { assetUrl } from '../api';
 import type { User } from '../types';
-import logoMarkSvg from '../../../resources/brand/logo-mark.svg?raw';
 
 interface Props {
   user: Pick<User, 'username' | 'avatar_url'>;
@@ -32,16 +31,5 @@ export default function Avatar({ user, size = 36 }: Props) {
     <span className="avatar avatar-letter" style={style} aria-label={user.username}>
       {user.username.trim().charAt(0).toUpperCase() || '?'}
     </span>
-  );
-}
-
-export function LogoMark({ size = 28 }: { size?: number }) {
-  return (
-    <span
-      className="logo-mark"
-      style={{ width: size, height: size }}
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: logoMarkSvg }}
-    />
   );
 }

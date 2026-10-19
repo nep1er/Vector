@@ -5,6 +5,8 @@ import AuthPage from './pages/AuthPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProfilePage from './pages/ProfilePage';
 import TasksPage from './pages/TasksPage';
+import NotificationsPage from './pages/NotificationsPage';
+import ProjectPage from './pages/ProjectPage';
 
 /** Пускает дальше только авторизованных, остальных отправляет на вход. */
 function Protected() {
@@ -31,7 +33,10 @@ export default function App() {
       <Route element={<Protected />}>
         <Route element={<Layout />}>
           <Route index element={<ProjectsPage />} />
+          <Route path="projects/:projectId" element={<ProjectPage />} />
+          <Route path="projects/:projectId/roadmap/:roadmapId" element={<ProjectPage />} />
           <Route path="tasks" element={<TasksPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>

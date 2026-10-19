@@ -10,29 +10,25 @@ export const authMiddleware = (req, res, next) => {
     return next();
   }
 
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ message: 'Ошибка авторизации: Заголовок Authorization отсутствует' });
+  }
+
+  const token = authHeader.split(' ')[1]; // "Bearer <TOKEN>"
+  if (!token) {
+    return res.status(401).json({ message: 'Ошибка авторизации: Токен не предоставлен' });
+  }
+
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      return res.status(401).json({ message: 'Ошибка авторизации: Заголовок Authorization отсутствует' });
-    }
-
-    const token = authHeader.split(' ')[1]; // "Bearer <TOKEN>"
-
-    if (!token) {
-      return res.status(401).json({ message: 'Ошибка авторизации: Токен не предоставлен' });
-    }
-
     // Расшифровываем токен с помощью секретного ключа из .env
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key');
-    
-    // Помещаем декодированные данные (id, email) в объект запроса
-    req.user = decoded;
-    
+    req.user = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key');
     next();
   } catch (error) {
     console.error('JWT Verification Error:', error.message);
-    return res.status(403).json({ message: 'Недействительный или просроченный токен авторизации' });
+    // 401 — токен недействителен или просрочен: клиент должен войти заново.
+    // (403 теперь означает только «нет прав на действие»)
+    return res.status(401).json({ message: 'Недействительный или просроченный токен авторизации' });
   }
 };
 

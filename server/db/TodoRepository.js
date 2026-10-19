@@ -6,19 +6,19 @@ export class TodoRepository {
    * Создаёт ToDo-задачу + 3 стандартные колонки канбана в одной транзакции.
    * Если parentRoadmapId не передан — задача попадёт в корневую RoadMap проекта.
    */
-  static async createTodoTask(projectId, title, parentRoadmapId = null) {
+  static async createTodoTask(projectId, title, parentRoadmapId = null, startDate = null, endDate = null) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // 1. Базовая запись в task (client — ШЕСТЫМ аргументом, после дат)
+      // 1. Базовая запись в task (даты нужны, чтобы задача отображалась на временной шкале)
       const baseTask = await TaskRepository.createBaseTask(
         projectId,
         'TODO',
         title,
         parentRoadmapId,
-        null, // startDate
-        null, // endDate
+        startDate,
+        endDate,
         client
       );
 

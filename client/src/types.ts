@@ -22,6 +22,11 @@ export interface Project {
   participant_id?: number;
 }
 
+/** Проект + права текущего пользователя в нём (READ, WRITE, EXECUTE, ADMIN) */
+export interface ProjectDetails extends Project {
+  permissions: string[];
+}
+
 export type TaskType = 'ROADMAP' | 'TODO';
 
 export interface Task {

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { ProjectRepository } from '../db/ProjectRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { checkProjectAccess } from '../middleware/rbacMiddleware.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = Router();
 
@@ -23,7 +25,7 @@ const router = Router();
  *       200:
  *         description: Список проектов
  *   post:
- *     summary: Создать новый проект (автоматически создает главную RoadMap)
+ *     summary: Создать новый проект (автоматически создает главную RoadMap и стандартные роли)
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -51,29 +53,32 @@ router.get('/', authMiddleware, async (req, res) => {
     const projects = await ProjectRepository.getUserProjects(req.user.id);
     res.json(projects);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка при получении списка проектов' });
+    sendError(res, e, 'Ошибка при получении списка проектов');
   }
 });
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const title = String(req.body.title ?? '').trim();
+    const description = req.body.description ? String(req.body.description).trim() : null;
     if (!title) {
       return res.status(400).json({ message: 'Название проекта обязательно' });
+    }
+    if (title.length > 150) {
+      return res.status(400).json({ message: 'Название проекта — не длиннее 150 символов' });
     }
     const newProject = await ProjectRepository.createProject(title, description, req.user.id);
     res.status(201).json(newProject);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка при создании проекта' });
+    sendError(res, e, 'Ошибка при создании проекта');
   }
 });
 
-
 /**
  * @swagger
- * /api/projects/{projectId}/participants/{userId}:
- *   delete:
- *     summary: Исключить участника из проекта
+ * /api/projects/{projectId}:
+ *   get:
+ *     summary: Получить проект и права текущего пользователя в нём
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -83,55 +88,84 @@ router.post('/', authMiddleware, async (req, res) => {
  *         required: true
  *         schema:
  *           type: integer
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
  *     responses:
  *       200:
- *         description: Участник исключен из проекта
- */
-router.delete('/:projectId/participants/:userId', authMiddleware, async (req, res) => {
-  try {
-    const { projectId, userId } = req.params;
-    const removed = await ProjectRepository.removeParticipant(projectId, userId);
-    if (!removed) {
-      return res.status(404).json({ message: 'Участник не найден в проекте' });
-    }
-    res.json({ message: 'Участник успешно исключен из проекта', userId });
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка при исключении участника' });
-  }
-});
-
-/**
- * @swagger
- * /api/projects/{id}:
- *   delete:
- *     summary: Удалить проект по ID
+ *         description: Проект с полем permissions (READ, WRITE, EXECUTE, ADMIN)
+ *       403:
+ *         description: Нет доступа к проекту
+ *       404:
+ *         description: Проект не найден
+ *   patch:
+ *     summary: Поменять название и/или описание проекта (право ADMIN)
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: projectId
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title: { type: string, example: "Новое имя проекта" }
+ *               description: { type: string, example: "Новое описание" }
+ *     responses:
+ *       200: { description: Проект обновлен }
+ *   delete:
+ *     summary: Удалить проект вместе со всеми задачами (право ADMIN)
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: projectId
  *         required: true
  *         schema:
  *           type: integer
  *     responses:
  *       200:
  *         description: Проект успешно удален
+ *       403:
+ *         description: Недостаточно прав
  */
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.get('/:projectId', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
   try {
-    const deleted = await ProjectRepository.deleteProject(req.params.id);
+    const project = await ProjectRepository.findById(req.params.projectId);
+    if (!project) return res.status(404).json({ message: 'Проект не найден' });
+    res.json({ ...project, permissions: req.userPermissions });
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения проекта');
+  }
+});
+
+router.patch('/:projectId', authMiddleware, checkProjectAccess('ADMIN'), async (req, res) => {
+  try {
+    const title = req.body.title !== undefined ? String(req.body.title).trim() : null;
+    const description = req.body.description !== undefined ? String(req.body.description).trim() : null;
+    if (title !== null && !title) {
+      return res.status(400).json({ message: 'Название проекта не может быть пустым' });
+    }
+    const updated = await ProjectRepository.updateProjectDetails(req.params.projectId, title, description);
+    if (!updated) return res.status(404).json({ message: 'Проект не найден' });
+    res.json(updated);
+  } catch (e) {
+    sendError(res, e, 'Ошибка обновления проекта');
+  }
+});
+
+router.delete('/:projectId', authMiddleware, checkProjectAccess('ADMIN'), async (req, res) => {
+  try {
+    const deleted = await ProjectRepository.deleteProject(req.params.projectId);
     if (!deleted) {
       return res.status(404).json({ message: 'Проект не найден' });
     }
-    res.json({ message: 'Проект успешно удален', id: req.params.id });
+    res.json({ message: 'Проект успешно удален', id: req.params.projectId });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка при удалении проекта' });
+    sendError(res, e, 'Ошибка при удалении проекта');
   }
 });
 
@@ -139,7 +173,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
  * @swagger
  * /api/projects/{projectId}/participants:
  *   post:
- *     summary: Добавить участника в проект
+ *     summary: Добавить участника в проект (право ADMIN)
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -164,22 +198,24 @@ router.delete('/:id', authMiddleware, async (req, res) => {
  *     responses:
  *       201:
  *         description: Участник добавлен в проект
+ *       409:
+ *         description: Пользователь уже участвует в проекте
  */
-router.post('/:projectId/participants', authMiddleware, async (req, res) => {
+router.post('/:projectId/participants', authMiddleware, checkProjectAccess('ADMIN'), async (req, res) => {
   try {
     const { userId } = req.body;
     const participant = await ProjectRepository.addParticipant(req.params.projectId, userId);
     res.status(201).json(participant);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка добавления участника в проект' });
+    sendError(res, e, 'Ошибка добавления участника в проект');
   }
 });
 
 /**
  * @swagger
- * /api/projects/{projectId}:
- *   patch:
- *     summary: Поменять название и/или описание проекта
+ * /api/projects/{projectId}/participants/{userId}:
+ *   delete:
+ *     summary: Исключить участника из проекта (право ADMIN)
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -187,26 +223,33 @@ router.post('/:projectId/participants', authMiddleware, async (req, res) => {
  *       - in: path
  *         name: projectId
  *         required: true
- *         schema: { type: integer }
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               title: { type: string, example: "Новое имя проекта" }
- *               description: { type: string, example: "Новое описание" }
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
  *     responses:
- *       200: { description: Проект обновлен }
+ *       200:
+ *         description: Участник исключен из проекта
  */
-router.patch('/:projectId', authMiddleware, async (req, res) => {
-  try {
-    const { title, description } = req.body;
-    const updated = await ProjectRepository.updateProjectDetails(req.params.projectId, title, description);
-    res.json(updated);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления проекта' });
+router.delete(
+  '/:projectId/participants/:userId',
+  authMiddleware,
+  checkProjectAccess('ADMIN'),
+  async (req, res) => {
+    try {
+      const { projectId, userId } = req.params;
+      const removed = await ProjectRepository.removeParticipant(projectId, userId);
+      if (!removed) {
+        return res.status(404).json({ message: 'Участник не найден в проекте' });
+      }
+      res.json({ message: 'Участник успешно исключен из проекта', userId });
+    } catch (e) {
+      sendError(res, e, 'Ошибка при исключении участника');
+    }
   }
-});
+);
 
 export default router;

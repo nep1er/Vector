@@ -23,7 +23,11 @@ export type IconName =
   | 'camera'
   | 'menu'
   | 'close'
-  | 'check';
+  | 'check'
+  | 'bell'
+  | 'trash'
+  | 'minus'
+  | 'roadmap';
 
 export default function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return (
