@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import CreateProjectModal from '../components/CreateProjectModal';
+import Icon from '../components/Icon';
 import type { Project } from '../types';
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+const GRADIENTS = 6;
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -36,18 +36,14 @@ export default function ProjectsPage() {
   return (
     <>
       <div className="page-head">
-        <div>
-          <h1>Мои проекты</h1>
-          <p className="muted">Проекты, в которых вы участвуете</p>
-        </div>
+        <h1>Проекты</h1>
         <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          <Icon name="plus" size={18} />
           Создать проект
         </button>
       </div>
 
-      {loading && <div className="muted">Загружаем проекты…</div>}
-
-      {!loading && error && (
+      {error && (
         <div className="notice notice-err">
           {error}{' '}
           <button className="link-btn" onClick={load}>
@@ -56,28 +52,31 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {!loading && !error && projects.length === 0 && (
-        <div className="empty">
-          <h2>Проектов пока нет</h2>
-          <p className="muted">Создайте первый проект — и запланируйте год по месяцам.</p>
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            Создать проект
-          </button>
-        </div>
-      )}
-
-      {!loading && projects.length > 0 && (
-        <ul className="project-grid">
-          {projects.map((p) => (
-            <li key={p.id} className="project-card">
-              <h3>{p.title}</h3>
-              <p className={p.description ? 'project-desc' : 'project-desc muted'}>
-                {p.description || 'Без описания'}
-              </p>
-              <div className="project-meta">Создан {formatDate(p.created_at)}</div>
-            </li>
+      {loading ? (
+        <ul className="tiles" aria-busy="true">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="tile skeleton" />
           ))}
         </ul>
+      ) : (
+        !error && (
+          <ul className="tiles">
+            {projects.map((p) => (
+              <li key={p.id} className="tile" title={p.description ?? undefined}>
+                <div
+                  className="tile-cover"
+                  style={{ background: `var(--gradient-project-${(p.id % GRADIENTS) + 1})` }}
+                />
+                <div className="tile-title">{p.title}</div>
+              </li>
+            ))}
+            <li>
+              <button className="tile tile-create" onClick={() => setShowCreate(true)}>
+                Создать проект
+              </button>
+            </li>
+          </ul>
+        )
       )}
 
       {showCreate && (

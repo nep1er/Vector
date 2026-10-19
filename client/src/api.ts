@@ -31,6 +31,12 @@ export const tokenStorage = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
+/** Путь вида /uploads/... превращает в полный адрес (для картинок, лежащих на сервере) */
+export function assetUrl(path?: string | null): string | null {
+  if (!path) return null;
+  return /^https?:\/\//i.test(path) ? path : BASE_URL + path;
+}
+
 // ---------------------------------------------------------------------------
 // Ошибки и базовый запрос
 // ---------------------------------------------------------------------------
@@ -52,7 +58,9 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const isBlob = body instanceof Blob; // файл отправляем как есть, остальное — как JSON
+  if (isBlob) headers['Content-Type'] = (body as Blob).type;
+  else if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const token = tokenStorage.get();
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -62,7 +70,7 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
     res = await fetch(BASE_URL + path, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isBlob ? (body as Blob) : body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new ApiError(0, 'Не удалось связаться с сервером. Проверьте, что он запущен.');
@@ -107,6 +115,9 @@ const auth = {
 
   updateAvatar: (avatarUrl: string) =>
     request<User>('PATCH', '/api/auth/profile/avatar', { avatarUrl }),
+
+  /** Загрузка картинки аватара (PNG/JPEG/WebP до 2 МБ) */
+  uploadAvatar: (image: Blob) => request<User>('POST', '/api/auth/profile/avatar/upload', image),
 
   deleteAccount: () => request<{ message: string }>('DELETE', '/api/auth/account'),
 };

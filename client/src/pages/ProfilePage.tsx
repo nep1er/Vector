@@ -1,164 +1,247 @@
-import { useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import { useRef, useState } from 'react';
+import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import Avatar from '../components/Avatar';
+import Icon from '../components/Icon';
+import { prepareAvatar } from '../utils/image';
 
-interface Status {
-  kind: 'ok' | 'err';
-  text: string;
-}
+type RowId = 'username' | 'email' | 'password' | 'delete';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : 'Что-то пошло не так');
 
-function Section({
-  title,
-  hint,
-  status,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  status: Status | null;
+interface RowProps {
+  label: string;
+  value?: string;
+  open: boolean;
+  onToggle: () => void;
+  actionLabel?: string;
+  danger?: boolean;
   children: ReactNode;
-}) {
+}
+
+/** Строка настроек: значение + кнопка, по которой раскрывается форма редактирования. */
+function Row({ label, value, open, onToggle, actionLabel = 'Изменить', danger, children }: RowProps) {
   return (
-    <section className="card section">
-      <h2>{title}</h2>
-      {hint && <p className="muted">{hint}</p>}
-      {children}
-      {status && (
-        <div className={status.kind === 'ok' ? 'notice notice-ok' : 'notice notice-err'}>
-          {status.text}
+    <div className="row">
+      <div className="row-head">
+        <div className="row-text">
+          <div className="row-label">{label}</div>
+          {value && !open && <div className="row-value">{value}</div>}
         </div>
-      )}
-    </section>
+        <button
+          type="button"
+          className={danger && !open ? 'btn btn-danger-ghost' : 'btn btn-quiet'}
+          onClick={onToggle}
+        >
+          {open ? 'Отмена' : actionLabel}
+        </button>
+      </div>
+      {open && <div className="row-body">{children}</div>}
+    </div>
   );
 }
 
 export default function ProfilePage() {
   const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const [username, setUsername] = useState(user?.username ?? '');
-  const [email, setEmail] = useState(user?.email ?? '');
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url ?? '');
+  const [openRow, setOpenRow] = useState<RowId | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState('');
+
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
   const [deleteWord, setDeleteWord] = useState('');
 
-  const [nameStatus, setNameStatus] = useState<Status | null>(null);
-  const [emailStatus, setEmailStatus] = useState<Status | null>(null);
-  const [avatarStatus, setAvatarStatus] = useState<Status | null>(null);
-  const [passStatus, setPassStatus] = useState<Status | null>(null);
-  const [deleteStatus, setDeleteStatus] = useState<Status | null>(null);
-
   if (!user) return null;
 
-  const saveUsername = async (e: FormEvent) => {
+  const notify = (text: string) => {
+    setToast(text);
+    window.setTimeout(() => setToast(''), 2600);
+  };
+
+  const toggle = (id: RowId) => {
+    setError('');
+    setOpenRow((prev) => (prev === id ? null : id));
+    setUsername(user.username);
+    setEmail(user.email);
+    setOldPassword('');
+    setNewPassword('');
+    setRepeatPassword('');
+    setDeleteWord('');
+  };
+
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickAvatar = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setOpenRow(null);
+    run(async () => {
+      const image = await prepareAvatar(file);
+      updateUser(await api.auth.uploadAvatar(image));
+      notify('Фото обновлено');
+    });
+  };
+
+  const removeAvatar = () =>
+    run(async () => {
+      updateUser(await api.auth.updateAvatar(''));
+      notify('Фото удалено');
+    });
+
+  const saveUsername = (e: FormEvent) => {
     e.preventDefault();
     const value = username.trim();
-    if (!value) return setNameStatus({ kind: 'err', text: 'Имя не может быть пустым' });
-    try {
+    if (!value) return setError('Имя не может быть пустым');
+    run(async () => {
       updateUser(await api.auth.updateUsername(value));
-      setNameStatus({ kind: 'ok', text: 'Имя сохранено' });
-    } catch (err) {
-      setNameStatus({ kind: 'err', text: errText(err) });
-    }
+      setOpenRow(null);
+      notify('Имя пользователя сохранено');
+    });
   };
 
-  const saveEmail = async (e: FormEvent) => {
+  const saveEmail = (e: FormEvent) => {
     e.preventDefault();
     const value = email.trim();
-    if (!value.includes('@')) return setEmailStatus({ kind: 'err', text: 'Введите корректный email' });
-    try {
+    if (!/^\S+@\S+\.\S+$/.test(value)) return setError('Введите корректный email');
+    run(async () => {
       updateUser(await api.auth.updateEmail(value));
-      setEmailStatus({ kind: 'ok', text: 'Email сохранён. Используйте его при следующем входе.' });
-    } catch (err) {
-      setEmailStatus({ kind: 'err', text: errText(err) });
-    }
+      setOpenRow(null);
+      notify('Email сохранён');
+    });
   };
 
-  const saveAvatar = async (e: FormEvent) => {
+  const savePassword = (e: FormEvent) => {
     e.preventDefault();
-    try {
-      updateUser(await api.auth.updateAvatar(avatarUrl.trim()));
-      setAvatarStatus({ kind: 'ok', text: avatarUrl.trim() ? 'Аватар обновлён' : 'Аватар удалён' });
-    } catch (err) {
-      setAvatarStatus({ kind: 'err', text: errText(err) });
-    }
-  };
-
-  const savePassword = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!oldPassword || !newPassword) return setPassStatus({ kind: 'err', text: 'Заполните оба пароля' });
-    if (newPassword.length < 6) return setPassStatus({ kind: 'err', text: 'Новый пароль — не короче 6 символов' });
-    if (newPassword !== repeatPassword) return setPassStatus({ kind: 'err', text: 'Новые пароли не совпадают' });
-    try {
+    if (!oldPassword || !newPassword) return setError('Заполните все поля');
+    if (newPassword.length < 6) return setError('Новый пароль — не короче 6 символов');
+    if (newPassword !== repeatPassword) return setError('Новые пароли не совпадают');
+    run(async () => {
       await api.auth.updatePassword(oldPassword, newPassword);
-      setOldPassword('');
-      setNewPassword('');
-      setRepeatPassword('');
-      setPassStatus({ kind: 'ok', text: 'Пароль изменён' });
-    } catch (err) {
-      setPassStatus({ kind: 'err', text: errText(err) });
-    }
+      setOpenRow(null);
+      notify('Пароль изменён');
+    });
   };
 
-  const deleteAccount = async (e: FormEvent) => {
+  const deleteAccount = (e: FormEvent) => {
     e.preventDefault();
-    try {
+    run(async () => {
       await api.auth.deleteAccount();
       logout();
       navigate('/login', { replace: true });
-    } catch (err) {
-      setDeleteStatus({ kind: 'err', text: errText(err) });
-    }
+    });
   };
 
+  const errorBox = error && <div className="notice notice-err">{error}</div>;
+
   return (
-    <>
-      <div className="page-head">
-        <div>
-          <h1>Профиль</h1>
-          <p className="muted">Личные данные и безопасность аккаунта</p>
-        </div>
+    <div className="profile">
+      <h1>Настройки профиля</h1>
+
+      <div className="profile-hero">
+        <button
+          type="button"
+          className="avatar-edit"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          aria-label="Изменить фото профиля"
+        >
+          <Avatar user={user} size={112} />
+          <span className="avatar-overlay">
+            <Icon name="camera" size={26} />
+          </span>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          hidden
+          accept="image/png,image/jpeg,image/webp"
+          onChange={pickAvatar}
+        />
+        <div className="hero-name">{user.username}</div>
+        {user.avatar_url && (
+          <button type="button" className="link-btn muted" onClick={removeAvatar} disabled={busy}>
+            Удалить фото
+          </button>
+        )}
+        {!openRow && errorBox}
       </div>
 
-      <div className="profile-grid">
-        <Section title="Аватар" hint="Вставьте ссылку на изображение. Пустое поле — без аватара." status={avatarStatus}>
-          <form className="inline-form" onSubmit={saveAvatar}>
-            <Avatar user={{ username, avatar_url: avatarUrl.trim() || null }} size={64} />
+      <div className="rows">
+        <Row
+          label="Имя пользователя"
+          value={user.username}
+          open={openRow === 'username'}
+          onToggle={() => toggle('username')}
+        >
+          <form onSubmit={saveUsername}>
             <input
-              value={avatarUrl}
-              placeholder="https://example.com/photo.png"
-              onChange={(e) => setAvatarUrl(e.target.value)}
+              autoFocus
+              value={username}
+              maxLength={50}
+              onChange={(e) => setUsername(e.target.value)}
             />
-            <button className="btn btn-primary">Сохранить</button>
+            {errorBox}
+            <div className="form-actions">
+              <button className="btn btn-primary" disabled={busy}>
+                Сохранить
+              </button>
+            </div>
           </form>
-        </Section>
+        </Row>
 
-        <Section title="Имя пользователя" status={nameStatus}>
-          <form className="inline-form" onSubmit={saveUsername}>
-            <input value={username} maxLength={50} onChange={(e) => setUsername(e.target.value)} />
-            <button className="btn btn-primary">Сохранить</button>
+        <Row
+          label="Email"
+          value={user.email}
+          open={openRow === 'email'}
+          onToggle={() => toggle('email')}
+        >
+          <form onSubmit={saveEmail}>
+            <input
+              autoFocus
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            {errorBox}
+            <div className="form-actions">
+              <button className="btn btn-primary" disabled={busy}>
+                Сохранить
+              </button>
+            </div>
           </form>
-        </Section>
+        </Row>
 
-        <Section title="Email" hint="Email — ваш логин для входа." status={emailStatus}>
-          <form className="inline-form" onSubmit={saveEmail}>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <button className="btn btn-primary">Сохранить</button>
-          </form>
-        </Section>
-
-        <Section title="Смена пароля" status={passStatus}>
-          <form className="stack-form" onSubmit={savePassword}>
+        <Row
+          label="Пароль"
+          value="••••••••"
+          open={openRow === 'password'}
+          onToggle={() => toggle('password')}
+        >
+          <form onSubmit={savePassword}>
             <label className="field">
               <span>Текущий пароль</span>
               <input
+                autoFocus
                 type="password"
                 autoComplete="current-password"
                 value={oldPassword}
@@ -183,25 +266,48 @@ export default function ProfilePage() {
                 onChange={(e) => setRepeatPassword(e.target.value)}
               />
             </label>
-            <button className="btn btn-primary">Изменить пароль</button>
+            {errorBox}
+            <div className="form-actions">
+              <button className="btn btn-primary" disabled={busy}>
+                Изменить пароль
+              </button>
+            </div>
           </form>
-        </Section>
+        </Row>
 
-        <section className="card section danger-zone">
-          <h2>Удаление аккаунта</h2>
-          <p className="muted">
-            Аккаунт и все связанные с ним записи будут удалены без возможности восстановления.
-            Чтобы подтвердить, введите слово «удалить».
-          </p>
-          <form className="inline-form" onSubmit={deleteAccount}>
-            <input value={deleteWord} placeholder="удалить" onChange={(e) => setDeleteWord(e.target.value)} />
-            <button className="btn btn-danger" disabled={deleteWord.trim().toLowerCase() !== 'удалить'}>
-              Удалить аккаунт
-            </button>
+        <Row
+          label="Удалить аккаунт"
+          actionLabel="Удалить"
+          danger
+          open={openRow === 'delete'}
+          onToggle={() => toggle('delete')}
+        >
+          <form onSubmit={deleteAccount}>
+            <input
+              autoFocus
+              value={deleteWord}
+              placeholder="Введите «удалить» для подтверждения"
+              onChange={(e) => setDeleteWord(e.target.value)}
+            />
+            {errorBox}
+            <div className="form-actions">
+              <button
+                className="btn btn-danger"
+                disabled={busy || deleteWord.trim().toLowerCase() !== 'удалить'}
+              >
+                Удалить навсегда
+              </button>
+            </div>
           </form>
-          {deleteStatus && <div className="notice notice-err">{deleteStatus.text}</div>}
-        </section>
+        </Row>
       </div>
-    </>
+
+      {toast && (
+        <div className="toast" role="status">
+          <Icon name="check" size={18} />
+          {toast}
+        </div>
+      )}
+    </div>
   );
 }

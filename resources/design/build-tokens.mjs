@@ -1,0 +1,28 @@
+// Генерирует tokens.css из tokens.json.
+// Запуск (из любой папки):  node resources/design/build-tokens.mjs
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const dir = dirname(fileURLToPath(import.meta.url));
+const tokens = JSON.parse(readFileSync(join(dir, 'tokens.json'), 'utf8'));
+
+const lines = [];
+for (const [group, values] of Object.entries(tokens)) {
+  if (group === 'gradients') {
+    for (const [name, [from, to]] of Object.entries(values)) {
+      lines.push(`  --gradient-${name}: linear-gradient(135deg, ${from}, ${to});`);
+    }
+  } else {
+    for (const [name, value] of Object.entries(values)) {
+      lines.push(`  --${group}-${name}: ${value};`);
+    }
+  }
+}
+
+const css =
+  '/* Создан автоматически из tokens.json (node build-tokens.mjs). Не редактировать вручную. */\n' +
+  `:root {\n${lines.join('\n')}\n}\n`;
+
+writeFileSync(join(dir, 'tokens.css'), css);
+console.log(`tokens.css: ${lines.length} переменных`);

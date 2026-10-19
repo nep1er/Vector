@@ -1,9 +1,34 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import bcrypt from 'bcrypt';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { UserRepository } from '../db/UserRepository.js';
 import { authMiddleware, generateToken } from '../middleware/authMiddleware.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = Router();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const AVATAR_DIR = path.join(__dirname, '..', 'uploads', 'avatars');
+const AVATAR_URL_PREFIX = '/uploads/avatars/';
+
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
+
+// Проверка по первым байтам файла — не доверяем только заголовку Content-Type
+const IMAGE_SIGNATURES = {
+  'image/png': (b) => b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47,
+  'image/jpeg': (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  'image/webp': (b) =>
+    b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP',
+};
+const IMAGE_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+
+/** Удаляет файл аватара с диска, если он был загружен на наш сервер */
+async function removeLocalAvatar(avatarUrl) {
+  if (!avatarUrl || !avatarUrl.startsWith(AVATAR_URL_PREFIX)) return;
+  await fs.unlink(path.join(AVATAR_DIR, path.basename(avatarUrl))).catch(() => {});
+}
 
 /**
  * @swagger
@@ -35,21 +60,31 @@ const router = Router();
  *       201:
  *         description: Пользователь создан, возвращён JWT-токен
  *       400:
- *         description: Не все поля заполнены или email занят
+ *         description: Не все поля заполнены или некорректные данные
+ *       409:
+ *         description: Email или имя пользователя уже заняты
  *       500:
  *         description: Внутренняя ошибка сервера
  */
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const username = String(req.body.username ?? '').trim();
+    const email = String(req.body.email ?? '').trim();
+    const password = String(req.body.password ?? '');
 
     if (!email || !password || !username) {
       return res.status(400).json({ message: 'Заполните все обязательные поля' });
     }
+    if (!EMAIL_RE.test(email)) {
+      return res.status(400).json({ message: 'Введите корректный email' });
+    }
+    if (username.length > 50) {
+      return res.status(400).json({ message: 'Имя пользователя — не длиннее 50 символов' });
+    }
 
     const candidate = await UserRepository.findByEmail(email);
     if (candidate) {
-      return res.status(400).json({ message: 'Пользователь с таким email уже зарегистрирован' });
+      return res.status(409).json({ message: 'Пользователь с таким email уже зарегистрирован' });
     }
 
     const hashPassword = await bcrypt.hash(password, 10);
@@ -58,8 +93,7 @@ router.post('/register', async (req, res) => {
 
     return res.status(201).json({ token, user: newUser });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Ошибка при регистрации пользователя' });
+    return sendError(res, error, 'Ошибка при регистрации пользователя');
   }
 });
 
@@ -97,12 +131,12 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await UserRepository.findByEmail(email);
+    const user = await UserRepository.findByEmail(String(email ?? '').trim());
     if (!user) {
       return res.status(400).json({ message: 'Пользователь не найден' });
     }
 
-    const isPassValid = await bcrypt.compare(password, user.password_hash);
+    const isPassValid = await bcrypt.compare(String(password ?? ''), user.password_hash);
     if (!isPassValid) {
       return res.status(400).json({ message: 'Введен неверный пароль' });
     }
@@ -111,11 +145,15 @@ router.post('/login', async (req, res) => {
 
     return res.json({
       token,
-      user: { id: user.id, username: user.username, email: user.email }
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        avatar_url: user.avatar_url,
+      },
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Ошибка при входе в систему' });
+    return sendError(res, error, 'Ошибка при входе в систему');
   }
 });
 
@@ -138,9 +176,10 @@ router.post('/login', async (req, res) => {
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await UserRepository.findById(req.user.id);
+    if (!user) return res.status(401).json({ message: 'Пользователь не найден' });
     return res.json(user);
   } catch (error) {
-    return res.status(500).json({ message: 'Ошибка получения данных профиля' });
+    return sendError(res, error, 'Ошибка получения данных профиля');
   }
 });
 
@@ -163,14 +202,19 @@ router.get('/me', authMiddleware, async (req, res) => {
  *               username: { type: string, example: "alex_pro" }
  *     responses:
  *       200: { description: Имя изменено }
+ *       409: { description: Имя уже занято }
  */
 router.patch('/profile/username', authMiddleware, async (req, res) => {
   try {
-    const { username } = req.body;
+    const username = String(req.body.username ?? '').trim();
+    if (!username) return res.status(400).json({ message: 'Имя не может быть пустым' });
+    if (username.length > 50) {
+      return res.status(400).json({ message: 'Имя пользователя — не длиннее 50 символов' });
+    }
     const updated = await UserRepository.updateUsername(req.user.id, username);
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления имени' });
+    sendError(res, e, 'Ошибка обновления имени');
   }
 });
 
@@ -193,14 +237,21 @@ router.patch('/profile/username', authMiddleware, async (req, res) => {
  *               email: { type: string, example: "new_email@vector.ru" }
  *     responses:
  *       200: { description: Email изменен }
+ *       409: { description: Email уже используется }
  */
 router.patch('/profile/email', authMiddleware, async (req, res) => {
   try {
-    const { email } = req.body;
+    const email = String(req.body.email ?? '').trim();
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ message: 'Введите корректный email' });
+
+    const owner = await UserRepository.findByEmail(email);
+    if (owner && owner.id !== req.user.id) {
+      return res.status(409).json({ message: 'Этот email уже используется' });
+    }
     const updated = await UserRepository.updateEmail(req.user.id, email);
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления почты' });
+    sendError(res, e, 'Ошибка обновления почты');
   }
 });
 
@@ -224,20 +275,28 @@ router.patch('/profile/email', authMiddleware, async (req, res) => {
  *               newPassword: { type: string, example: "new_secret_password" }
  *     responses:
  *       200: { description: Пароль изменен }
+ *       400: { description: Старый пароль введён неверно }
  */
 router.patch('/profile/password', authMiddleware, async (req, res) => {
   try {
-    const { oldPassword, newPassword } = req.body;
-    const user = await UserRepository.findByEmail(req.user.email);
-    
+    const oldPassword = String(req.body.oldPassword ?? '');
+    const newPassword = String(req.body.newPassword ?? '');
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Новый пароль — не короче 6 символов' });
+    }
+
+    // Ищем по id, а не по email из токена: после смены почты токен хранит старый email
+    const user = await UserRepository.findByIdWithPassword(req.user.id);
+    if (!user) return res.status(401).json({ message: 'Пользователь не найден' });
+
     const isValid = await bcrypt.compare(oldPassword, user.password_hash);
-    if (!isValid) return res.status(400).json({ message: 'Старый пароль введён неверно' });
+    if (!isValid) return res.status(400).json({ message: 'Текущий пароль введён неверно' });
 
     const newHash = await bcrypt.hash(newPassword, 10);
     await UserRepository.updatePassword(req.user.id, newHash);
     res.json({ message: 'Пароль успешно обновлён' });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка смены пароля' });
+    sendError(res, e, 'Ошибка смены пароля');
   }
 });
 
@@ -245,7 +304,7 @@ router.patch('/profile/password', authMiddleware, async (req, res) => {
  * @swagger
  * /api/auth/profile/avatar:
  *   patch:
- *     summary: Сменить URL аватарки пользователя
+ *     summary: Задать аватарку ссылкой (пустая строка — удалить аватарку)
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
@@ -263,13 +322,67 @@ router.patch('/profile/password', authMiddleware, async (req, res) => {
  */
 router.patch('/profile/avatar', authMiddleware, async (req, res) => {
   try {
-    const { avatarUrl } = req.body;
+    const avatarUrl = String(req.body.avatarUrl ?? '').trim();
+    if (avatarUrl.length > 512) {
+      return res.status(400).json({ message: 'Ссылка слишком длинная' });
+    }
+    const previous = await UserRepository.findById(req.user.id);
     const updated = await UserRepository.updateAvatar(req.user.id, avatarUrl);
+    if (previous?.avatar_url !== updated?.avatar_url) await removeLocalAvatar(previous?.avatar_url);
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления аватарки' });
+    sendError(res, e, 'Ошибка обновления аватарки');
   }
 });
+
+/**
+ * @swagger
+ * /api/auth/profile/avatar/upload:
+ *   post:
+ *     summary: Загрузить файл аватарки (тело запроса — сама картинка PNG/JPEG/WebP до 2 МБ)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         image/png:
+ *           schema: { type: string, format: binary }
+ *         image/jpeg:
+ *           schema: { type: string, format: binary }
+ *         image/webp:
+ *           schema: { type: string, format: binary }
+ *     responses:
+ *       200: { description: Аватарка загружена, возвращён обновлённый профиль }
+ *       400: { description: Файл не является допустимой картинкой }
+ */
+router.post(
+  '/profile/avatar/upload',
+  authMiddleware,
+  express.raw({ type: Object.keys(IMAGE_EXT), limit: '2mb' }),
+  async (req, res) => {
+    try {
+      const type = (req.headers['content-type'] ?? '').split(';')[0].trim();
+      const body = req.body;
+
+      if (!Buffer.isBuffer(body) || body.length === 0 || !IMAGE_SIGNATURES[type]?.(body)) {
+        return res.status(400).json({ message: 'Загрузите изображение PNG, JPEG или WebP до 2 МБ' });
+      }
+
+      await fs.mkdir(AVATAR_DIR, { recursive: true });
+      const fileName = `${req.user.id}-${Date.now()}.${IMAGE_EXT[type]}`;
+      await fs.writeFile(path.join(AVATAR_DIR, fileName), body);
+
+      const previous = await UserRepository.findById(req.user.id);
+      const updated = await UserRepository.updateAvatar(req.user.id, AVATAR_URL_PREFIX + fileName);
+      await removeLocalAvatar(previous?.avatar_url);
+
+      res.json(updated);
+    } catch (e) {
+      sendError(res, e, 'Ошибка загрузки аватарки');
+    }
+  }
+);
 
 /**
  * @swagger
@@ -284,10 +397,12 @@ router.patch('/profile/avatar', authMiddleware, async (req, res) => {
  */
 router.delete('/account', authMiddleware, async (req, res) => {
   try {
+    const user = await UserRepository.findById(req.user.id);
     await UserRepository.deleteUser(req.user.id);
+    await removeLocalAvatar(user?.avatar_url);
     res.json({ message: 'Ваш аккаунт и все связанные записи успешно удалены' });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка при удалении аккаунта' });
+    sendError(res, e, 'Ошибка при удалении аккаунта');
   }
 });
 

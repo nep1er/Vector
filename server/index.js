@@ -27,6 +27,9 @@ app.use(express.json());
 // Раздаем папку public
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
+// Загруженные пользователями файлы (аватарки)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Настройки кастомизации Swagger UI
 const customSwaggerOptions = {
   customCssUrl: '/public/custom.css',

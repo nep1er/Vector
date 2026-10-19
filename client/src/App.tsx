@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import AuthPage from './pages/AuthPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProfilePage from './pages/ProfilePage';
+import TasksPage from './pages/TasksPage';
 
 /** Пускает дальше только авторизованных, остальных отправляет на вход. */
 function Protected() {
@@ -30,6 +31,7 @@ export default function App() {
       <Route element={<Protected />}>
         <Route element={<Layout />}>
           <Route index element={<ProjectsPage />} />
+          <Route path="tasks" element={<TasksPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>

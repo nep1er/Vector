@@ -49,17 +49,13 @@ export default function CreateProjectModal({ onClose, onCreated }: Props) {
         onSubmit={submit}
       >
         <h2 id="create-title">Новый проект</h2>
-        <p className="muted">
-          Вместе с проектом автоматически создастся главный план (корневая RoadMap).
-        </p>
-
         <label className="field">
           <span>Название</span>
           <input
             autoFocus
             value={title}
             maxLength={150}
-            placeholder="Например, Разработка мобильного приложения"
+            placeholder="Название проекта"
             onChange={(e) => setTitle(e.target.value)}
           />
         </label>
@@ -69,7 +65,7 @@ export default function CreateProjectModal({ onClose, onCreated }: Props) {
           <textarea
             rows={4}
             value={description}
-            placeholder="Коротко: о чём проект и какая у него цель"
+            placeholder="О чём проект"
             onChange={(e) => setDescription(e.target.value)}
           />
         </label>

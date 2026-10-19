@@ -1,3 +1,12 @@
+// Понятные сообщения для нарушений уникальности (имя ограничения -> текст)
+const UNIQUE_MESSAGES = {
+  users_email_key: 'Этот email уже используется',
+  users_username_key: 'Это имя пользователя уже занято',
+  uk_project_tag: 'Тег с таким названием уже есть в проекте',
+  uk_project_role: 'Роль с таким названием уже есть в проекте',
+  uk_project_user: 'Пользователь уже участвует в проекте',
+};
+
 /**
  * Превращает ошибку из репозитория в корректный HTTP-ответ.
  *
@@ -13,7 +22,9 @@ export function sendError(res, error, fallbackMessage = 'Внутренняя о
 
   switch (error?.code) {
     case '23505': // unique_violation
-      return res.status(409).json({ message: 'Такая запись уже существует' });
+      return res
+        .status(409)
+        .json({ message: UNIQUE_MESSAGES[error.constraint] ?? 'Такая запись уже существует' });
     case '23503': // foreign_key_violation
       return res.status(400).json({ message: 'Связанная запись не найдена' });
     case '23514': // check_violation (например, start_date > end_date)

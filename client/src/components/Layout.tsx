@@ -1,50 +1,33 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
-import Avatar, { LogoMark } from './Avatar';
+import { useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { LogoMark } from './Avatar';
+import Icon from './Icon';
+import Sidebar from './Sidebar';
 
 export default function Layout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
 
-  if (!user) return null;
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  // На телефоне после перехода по ссылке закрываем выезжающее меню
+  useEffect(() => setOpen(false), [pathname]);
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <div className="brand">
-            <LogoMark />
-            <span>Vector</span>
-          </div>
-
-          <nav className="tabs" aria-label="Основная навигация">
-            <NavLink to="/" end className={({ isActive }) => (isActive ? 'tab active' : 'tab')}>
-              Проекты
-            </NavLink>
-            <NavLink to="/profile" className={({ isActive }) => (isActive ? 'tab active' : 'tab')}>
-              Профиль
-            </NavLink>
-          </nav>
-
-          <div className="topbar-user">
-            <NavLink to="/profile" className="user-chip" title="Настройки профиля">
-              <Avatar user={user} size={32} />
-              <span className="user-name">{user.username}</span>
-            </NavLink>
-            <button className="btn btn-ghost-light" onClick={handleLogout}>
-              Выйти
-            </button>
-          </div>
-        </div>
+    <div className="shell">
+      <header className="mobile-bar">
+        <button className="icon-btn" onClick={() => setOpen(true)} aria-label="Открыть меню">
+          <Icon name="menu" />
+        </button>
+        <LogoMark size={24} />
+        <span>Vector</span>
       </header>
 
-      <main className="content">
-        <Outlet />
+      {open && <div className="scrim" onClick={() => setOpen(false)} />}
+      <Sidebar open={open} />
+
+      <main className="main">
+        <div className="main-inner">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
