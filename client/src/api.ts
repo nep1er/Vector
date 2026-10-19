@@ -1,0 +1,260 @@
+/**
+ * api.ts — единый справочник REST API сервера Vector.
+ *
+ * Здесь описаны ВСЕ эндпоинты серверной части (auth, projects, tasks, kanban, roles, tags).
+ * Страницы сайта не вызывают fetch напрямую — они только используют объект `api`.
+ * Те же пути и тела запросов подходят для Desktop и Mobile клиентов.
+ */
+import type {
+  AuthResponse,
+  KanbanColumn,
+  Project,
+  ProjectRole,
+  ProjectTag,
+  Task,
+  TaskNode,
+  User,
+} from './types';
+
+// В разработке пусто: запросы идут на тот же адрес, а Vite проксирует /api на сервер.
+// В продакшене можно задать VITE_API_URL=https://api.example.com в .env
+const BASE_URL: string = import.meta.env.VITE_API_URL ?? '';
+
+// ---------------------------------------------------------------------------
+// Токен
+// ---------------------------------------------------------------------------
+const TOKEN_KEY = 'vector_token';
+
+export const tokenStorage = {
+  get: (): string | null => localStorage.getItem(TOKEN_KEY),
+  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
+
+// ---------------------------------------------------------------------------
+// Ошибки и базовый запрос
+// ---------------------------------------------------------------------------
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** Вызывается, когда сервер ответил 401 — AuthContext подписывается и разлогинивает. */
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  unauthorizedHandler = fn;
+}
+
+type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+
+async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+  const token = tokenStorage.get();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(BASE_URL + path, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new ApiError(0, 'Не удалось связаться с сервером. Проверьте, что он запущен.');
+  }
+
+  const text = await res.text();
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
+
+  if (!res.ok) {
+    if (res.status === 401 && token) unauthorizedHandler?.();
+    throw new ApiError(res.status, data?.message ?? `Ошибка сервера (${res.status})`);
+  }
+  return data as T;
+}
+
+// ---------------------------------------------------------------------------
+// AUTH  /api/auth
+// ---------------------------------------------------------------------------
+const auth = {
+  register: (username: string, email: string, password: string) =>
+    request<AuthResponse>('POST', '/api/auth/register', { username, email, password }),
+
+  login: (email: string, password: string) =>
+    request<AuthResponse>('POST', '/api/auth/login', { email, password }),
+
+  me: () => request<User>('GET', '/api/auth/me'),
+
+  updateUsername: (username: string) =>
+    request<User>('PATCH', '/api/auth/profile/username', { username }),
+
+  updateEmail: (email: string) => request<User>('PATCH', '/api/auth/profile/email', { email }),
+
+  updatePassword: (oldPassword: string, newPassword: string) =>
+    request<{ message: string }>('PATCH', '/api/auth/profile/password', { oldPassword, newPassword }),
+
+  updateAvatar: (avatarUrl: string) =>
+    request<User>('PATCH', '/api/auth/profile/avatar', { avatarUrl }),
+
+  deleteAccount: () => request<{ message: string }>('DELETE', '/api/auth/account'),
+};
+
+// ---------------------------------------------------------------------------
+// PROJECTS  /api/projects
+// ---------------------------------------------------------------------------
+const projects = {
+  list: () => request<Project[]>('GET', '/api/projects'),
+
+  create: (title: string, description?: string) =>
+    request<Project>('POST', '/api/projects', { title, description }),
+
+  update: (projectId: number, data: { title?: string; description?: string }) =>
+    request<Project>('PATCH', `/api/projects/${projectId}`, data),
+
+  remove: (projectId: number) =>
+    request<{ message: string; id: string }>('DELETE', `/api/projects/${projectId}`),
+
+  addParticipant: (projectId: number, userId: number) =>
+    request<unknown>('POST', `/api/projects/${projectId}/participants`, { userId }),
+
+  removeParticipant: (projectId: number, userId: number) =>
+    request<{ message: string }>('DELETE', `/api/projects/${projectId}/participants/${userId}`),
+};
+
+// ---------------------------------------------------------------------------
+// TASKS  /api/tasks   (RoadMap и ToDo)
+// ---------------------------------------------------------------------------
+const tasks = {
+  /** Дерево всех задач проекта */
+  tree: (projectId: number) => request<TaskNode[]>('GET', `/api/tasks/projects/${projectId}/tree`),
+
+  createRoadmapStage: (
+    projectId: number,
+    data: { title: string; startDate?: string; endDate?: string; parentRoadmapId?: number | null },
+  ) => request<Task>('POST', `/api/tasks/projects/${projectId}/roadmap`, data),
+
+  createTodo: (projectId: number, title: string, parentRoadmapId: number) =>
+    request<Task>('POST', `/api/tasks/projects/${projectId}/todo`, { title, parentRoadmapId }),
+
+  remove: (taskId: number) => request<{ message: string }>('DELETE', `/api/tasks/${taskId}`),
+
+  updateTitle: (taskId: number, title: string) =>
+    request<Task>('PATCH', `/api/tasks/${taskId}/title`, { title }),
+
+  updateSubtypeTitle: (taskId: number, type: 'ROADMAP' | 'TODO', title: string) =>
+    request<unknown>('PATCH', `/api/tasks/${taskId}/subtype-title`, { type, title }),
+
+  updateDates: (taskId: number, startDate?: string, endDate?: string) =>
+    request<Task>('PATCH', `/api/tasks/${taskId}/dates`, { startDate, endDate }),
+};
+
+// ---------------------------------------------------------------------------
+// KANBAN  /api/kanban
+// ---------------------------------------------------------------------------
+const kanban = {
+  getBoard: (todoTaskId: number) =>
+    request<KanbanColumn[]>('GET', `/api/kanban/todo/${todoTaskId}/board`),
+
+  createColumn: (todoTaskId: number, title: string, position?: number) =>
+    request<unknown>('POST', '/api/kanban/columns', { todoTaskId, title, position }),
+
+  updateColumn: (columnId: number, data: { title?: string; position?: number }) =>
+    request<unknown>('PATCH', `/api/kanban/columns/${columnId}`, data),
+
+  deleteColumn: (columnId: number) =>
+    request<{ message: string }>('DELETE', `/api/kanban/columns/${columnId}`),
+
+  createCard: (data: {
+    columnId: number;
+    title: string;
+    description?: string;
+    cardStatusId?: number;
+    position?: number;
+  }) => request<unknown>('POST', '/api/kanban/cards', data),
+
+  moveCard: (cardId: number, targetColumnId: number, newStatusId: number) =>
+    request<unknown>('PATCH', `/api/kanban/cards/${cardId}/move`, { targetColumnId, newStatusId }),
+
+  updateCardDetails: (
+    cardId: number,
+    data: { title?: string; description?: string; workDate?: string },
+  ) => request<unknown>('PATCH', `/api/kanban/cards/${cardId}/details`, data),
+
+  updateCardStatus: (cardId: number, cardStatusId: number) =>
+    request<unknown>('PATCH', `/api/kanban/cards/${cardId}/status`, { cardStatusId }),
+
+  deleteCard: (cardId: number) =>
+    request<{ message: string }>('DELETE', `/api/kanban/cards/${cardId}`),
+
+  addCardFile: (cardId: number, filePath: string) =>
+    request<unknown>('POST', `/api/kanban/cards/${cardId}/files`, { filePath }),
+
+  deleteFile: (fileId: number) =>
+    request<{ message: string }>('DELETE', `/api/kanban/files/${fileId}`),
+
+  addCardParticipant: (cardId: number, projectParticipantId: number) =>
+    request<unknown>('POST', `/api/kanban/cards/${cardId}/participants`, { projectParticipantId }),
+
+  removeCardParticipant: (cardId: number, projectParticipantId: number) =>
+    request<unknown>('DELETE', `/api/kanban/cards/${cardId}/participants`, { projectParticipantId }),
+};
+
+// ---------------------------------------------------------------------------
+// ROLES (RBAC)  /api/roles
+// ---------------------------------------------------------------------------
+const roles = {
+  listByProject: (projectId: number) =>
+    request<ProjectRole[]>('GET', `/api/roles/project/${projectId}`),
+
+  create: (projectId: number, name: string) =>
+    request<ProjectRole>('POST', `/api/roles/project/${projectId}`, { name }),
+
+  rename: (roleId: number, name: string) =>
+    request<ProjectRole>('PATCH', `/api/roles/${roleId}/name`, { name }),
+
+  /** accessRightId: 1 = READ, 2 = WRITE, 3 = EXECUTE, 4 = ADMIN */
+  addRight: (roleId: number, accessRightId: number) =>
+    request<unknown>('POST', `/api/roles/${roleId}/rights`, { accessRightId }),
+
+  removeRight: (roleId: number, accessRightId: number) =>
+    request<unknown>('DELETE', `/api/roles/${roleId}/rights`, { accessRightId }),
+
+  assignToParticipant: (participantId: number, roleId: number) =>
+    request<unknown>('POST', '/api/roles/assign-to-participant', { participantId, roleId }),
+};
+
+// ---------------------------------------------------------------------------
+// TAGS  /api/tags
+// ---------------------------------------------------------------------------
+const tags = {
+  listByProject: (projectId: number) =>
+    request<ProjectTag[]>('GET', `/api/tags/project/${projectId}`),
+
+  create: (projectId: number, name: string, color?: string) =>
+    request<ProjectTag>('POST', `/api/tags/project/${projectId}`, { name, color }),
+
+  update: (tagId: number, data: { name?: string; colorCode?: string }) =>
+    request<ProjectTag>('PATCH', `/api/tags/${tagId}/details`, data),
+
+  remove: (tagId: number) => request<{ message: string }>('DELETE', `/api/tags/${tagId}`),
+
+  applyToCard: (cardId: number, tagId: number) =>
+    request<unknown>('POST', '/api/tags/apply', { cardId, tagId }),
+
+  removeFromCard: (cardId: number, tagId: number) =>
+    request<unknown>('DELETE', '/api/tags/remove-from-card', { cardId, tagId }),
+};
+
+export const api = { auth, projects, tasks, kanban, roles, tags };

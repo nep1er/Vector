@@ -1,21 +1,22 @@
 import { pool } from '../config/db.js';
 
+// В таблице kanban_card_files есть только: id, kanban_card_id, file_path, uploaded_at
 export class FileRepository {
   static async getCardFiles(cardId) {
     const res = await pool.query(
-      'SELECT * FROM kanban_card_files WHERE kanban_card_id = $1',
+      'SELECT * FROM kanban_card_files WHERE kanban_card_id = $1 ORDER BY uploaded_at',
       [cardId]
     );
     return res.rows;
   }
 
-  static async addFileToCard(cardId, fileUrl, fileName) {
+  static async addFileToCard(cardId, filePath) {
     const query = `
-      INSERT INTO kanban_card_files (kanban_card_id, file_url, file_name)
-      VALUES ($1, $2, $3)
+      INSERT INTO kanban_card_files (kanban_card_id, file_path)
+      VALUES ($1, $2)
       RETURNING *;
     `;
-    const res = await pool.query(query, [cardId, fileUrl, fileName]);
+    const res = await pool.query(query, [cardId, filePath]);
     return res.rows[0];
   }
 

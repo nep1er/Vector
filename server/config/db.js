@@ -5,6 +5,10 @@ dotenv.config();
 
 const { Pool } = pg;
 
+// PostgreSQL отдаёт bigint (тип 20) строкой: id приходили бы как "1", а не 1.
+// Все наши id — небольшие числа, поэтому безопасно превращаем их в number.
+pg.types.setTypeParser(20, (value) => parseInt(value, 10));
+
 export const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,

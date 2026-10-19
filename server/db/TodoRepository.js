@@ -2,29 +2,35 @@ import { pool } from '../config/db.js';
 import { TaskRepository } from './TaskRepository.js';
 
 export class TodoRepository {
-  static async createTodoTask(projectId, title, parentRoadmapId) {
+  /**
+   * Создаёт ToDo-задачу + 3 стандартные колонки канбана в одной транзакции.
+   * Если parentRoadmapId не передан — задача попадёт в корневую RoadMap проекта.
+   */
+  static async createTodoTask(projectId, title, parentRoadmapId = null) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // 1. Базовая запись в task
+      // 1. Базовая запись в task (client — ШЕСТЫМ аргументом, после дат)
       const baseTask = await TaskRepository.createBaseTask(
         projectId,
         'TODO',
         title,
         parentRoadmapId,
+        null, // startDate
+        null, // endDate
         client
       );
 
       // 2. Дочерняя часть в todo_task
-      const querySubtype = `
-        INSERT INTO todo_task (task_id, type, title)
-        VALUES ($1, 'TODO', $2)
-        RETURNING task_id, title;
-      `;
-      const subRes = await client.query(querySubtype, [baseTask.id, title]);
+      const subRes = await client.query(
+        `INSERT INTO todo_task (task_id, type, title)
+         VALUES ($1, 'TODO', $2)
+         RETURNING task_id;`,
+        [baseTask.id, baseTask.title]
+      );
 
-      // 3. Создаем дефолтные колонки Канбана для новой ToDo-задачи
+      // 3. Дефолтные колонки канбана
       const defaultColumns = ['К выполнению', 'В работе', 'Готово'];
       for (let i = 0; i < defaultColumns.length; i++) {
         await client.query(

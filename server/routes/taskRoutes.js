@@ -3,6 +3,7 @@ import { RoadmapRepository } from '../db/RoadmapRepository.js';
 import { TodoRepository } from '../db/TodoRepository.js';
 import { TaskRepository } from '../db/TaskRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ const router = Router();
  * @swagger
  * /api/tasks/projects/{projectId}/roadmap:
  *   post:
- *     summary: Создать под-этап RoadMap
+ *     summary: Создать под-этап RoadMap (если parentRoadmapId не указан — внутри корневой RoadMap)
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
@@ -51,6 +52,10 @@ const router = Router();
  *     responses:
  *       201:
  *         description: Этап создан
+ *       400:
+ *         description: Ошибка валидации (иерархия, даты)
+ *       404:
+ *         description: Проект или родитель не найден
  */
 router.post('/projects/:projectId/roadmap', authMiddleware, async (req, res) => {
   try {
@@ -61,7 +66,7 @@ router.post('/projects/:projectId/roadmap', authMiddleware, async (req, res) => 
     );
     res.status(201).json(stage);
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка создания этапа RoadMap' });
+    sendError(res, error, 'Ошибка создания этапа RoadMap');
   }
 });
 
@@ -87,13 +92,13 @@ router.post('/projects/:projectId/roadmap', authMiddleware, async (req, res) => 
  *             type: object
  *             required:
  *               - title
- *               - parentRoadmapId
  *             properties:
  *               title:
  *                 type: string
  *                 example: Разработка REST API роутов
  *               parentRoadmapId:
  *                 type: integer
+ *                 description: Если не указан — задача попадёт в корневую RoadMap
  *                 example: 1
  *     responses:
  *       201:
@@ -106,7 +111,7 @@ router.post('/projects/:projectId/todo', authMiddleware, async (req, res) => {
     const todo = await TodoRepository.createTodoTask(projectId, title, parentRoadmapId);
     res.status(201).json(todo);
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка создания ToDo задачи' });
+    sendError(res, error, 'Ошибка создания ToDo задачи');
   }
 });
 
@@ -114,7 +119,7 @@ router.post('/projects/:projectId/todo', authMiddleware, async (req, res) => {
  * @swagger
  * /api/tasks/projects/{projectId}/tree:
  *   get:
- *     summary: Получить дерево всех задач проекта (Рекурсивная выборка)
+ *     summary: Получить дерево всех задач проекта (массив корней, у каждого узла поле children)
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
@@ -133,7 +138,7 @@ router.get('/projects/:projectId/tree', authMiddleware, async (req, res) => {
     const tree = await TaskRepository.getProjectTree(req.params.projectId);
     res.json(tree);
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка получения дерева задач' });
+    sendError(res, error, 'Ошибка получения дерева задач');
   }
 });
 
@@ -141,7 +146,7 @@ router.get('/projects/:projectId/tree', authMiddleware, async (req, res) => {
  * @swagger
  * /api/tasks/{taskId}:
  *   delete:
- *     summary: Удалить задачу (RoadMap или ToDo) по ID
+ *     summary: Удалить задачу (RoadMap или ToDo) вместе с дочерними. Корневую RoadMap удалить нельзя.
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
@@ -154,6 +159,10 @@ router.get('/projects/:projectId/tree', authMiddleware, async (req, res) => {
  *     responses:
  *       200:
  *         description: Задача удалена
+ *       400:
+ *         description: Попытка удалить корневую RoadMap
+ *       404:
+ *         description: Задача не найдена
  */
 router.delete('/:taskId', authMiddleware, async (req, res) => {
   try {
@@ -163,7 +172,7 @@ router.delete('/:taskId', authMiddleware, async (req, res) => {
     }
     res.json({ message: 'Задача успешно удалена', id: req.params.taskId });
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка удаления задачи' });
+    sendError(res, error, 'Ошибка удаления задачи');
   }
 });
 
@@ -171,7 +180,7 @@ router.delete('/:taskId', authMiddleware, async (req, res) => {
  * @swagger
  * /api/tasks/{taskId}/title:
  *   patch:
- *     summary: Изменить название базовой задачи Task
+ *     summary: Изменить название задачи (обновляется и task, и подтип)
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
@@ -190,15 +199,16 @@ router.delete('/:taskId', authMiddleware, async (req, res) => {
  *             properties:
  *               title: { type: string, example: "Обновленный заголовок задачи" }
  *     responses:
- *       200: { description: Название Task изменено }
+ *       200: { description: Название изменено }
+ *       404: { description: Задача не найдена }
  */
 router.patch('/:taskId/title', authMiddleware, async (req, res) => {
   try {
-    const { title } = req.body;
-    const updated = await TaskRepository.updateTaskTitle(req.params.taskId, title);
+    const updated = await TaskRepository.updateTaskTitle(req.params.taskId, req.body.title);
+    if (!updated) return res.status(404).json({ message: 'Задача не найдена' });
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления названия задачи' });
+    sendError(res, e, 'Ошибка обновления названия задачи');
   }
 });
 
@@ -227,14 +237,16 @@ router.patch('/:taskId/title', authMiddleware, async (req, res) => {
  *               title: { type: string, example: "Кастомный заголовок субтипа" }
  *     responses:
  *       200: { description: Название субтипа изменено }
+ *       404: { description: Задача не найдена }
  */
 router.patch('/:taskId/subtype-title', authMiddleware, async (req, res) => {
   try {
     const { type, title } = req.body;
     const updated = await TaskRepository.updateSubtypeTitle(req.params.taskId, type, title);
+    if (!updated) return res.status(404).json({ message: 'Задача не найдена' });
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления названия подтипа' });
+    sendError(res, e, 'Ошибка обновления названия подтипа');
   }
 });
 
@@ -242,7 +254,7 @@ router.patch('/:taskId/subtype-title', authMiddleware, async (req, res) => {
  * @swagger
  * /api/tasks/{taskId}/dates:
  *   patch:
- *     summary: Изменить временные рамки (start_date / end_date) у задачи
+ *     summary: Изменить временные рамки (start_date / end_date) с проверкой границ родителя и дочерних задач
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
@@ -261,14 +273,17 @@ router.patch('/:taskId/subtype-title', authMiddleware, async (req, res) => {
  *               endDate: { type: string, example: "2026-06-01T00:00:00Z" }
  *     responses:
  *       200: { description: Даты задачи обновлены }
+ *       400: { description: Даты нарушают границы иерархии }
+ *       404: { description: Задача не найдена }
  */
 router.patch('/:taskId/dates', authMiddleware, async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
     const updated = await TaskRepository.updateTaskDates(req.params.taskId, startDate, endDate);
+    if (!updated) return res.status(404).json({ message: 'Задача не найдена' });
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления дат задачи' });
+    sendError(res, e, 'Ошибка обновления дат задачи');
   }
 });
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { TagRepository } from '../db/TagRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = Router();
 
@@ -61,25 +62,32 @@ const router = Router();
  *     responses:
  *       201:
  *         description: Тег успешно создан
- *       500:
- *         description: Ошибка при создании тега
+ *       409:
+ *         description: Тег с таким названием уже есть в проекте
  */
 router.get('/project/:projectId', authMiddleware, async (req, res) => {
   try {
     const tags = await TagRepository.getProjectTags(req.params.projectId);
     res.json(tags);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка получения тегов' });
+    sendError(res, e, 'Ошибка получения тегов');
   }
 });
 
 router.post('/project/:projectId', authMiddleware, async (req, res) => {
   try {
     const { name, color } = req.body;
-    const newTag = await TagRepository.createTag(req.params.projectId, name, color || '#808080');
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ message: 'Название тега обязательно' });
+    }
+    const newTag = await TagRepository.createTag(
+      req.params.projectId,
+      String(name).trim(),
+      color || '#808080'
+    );
     res.status(201).json(newTag);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка создания тега' });
+    sendError(res, e, 'Ошибка создания тега');
   }
 });
 
@@ -117,37 +125,9 @@ router.post('/apply', authMiddleware, async (req, res) => {
   try {
     const { cardId, tagId } = req.body;
     const applied = await TagRepository.applyTagToCard(cardId, tagId);
-    res.status(201).json(applied);
+    res.status(201).json(applied ?? { message: 'Тег уже привязан к карточке' });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка добавления тега к карточке' });
-  }
-});
-
-/**
- * @swagger
- * /api/tags/{tagId}:
- *   delete:
- *     summary: Удалить тег из проекта полностью
- *     tags: [Tags]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: tagId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Тег полностью удален из проекта
- */
-router.delete('/:tagId', authMiddleware, async (req, res) => {
-  try {
-    const deleted = await TagRepository.deleteTag(req.params.tagId);
-    if (!deleted) return res.status(404).json({ message: 'Тег не найден' });
-    res.json({ message: 'Тег успешно удален из проекта', id: req.params.tagId });
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка удаления тега' });
+    sendError(res, e, 'Ошибка добавления тега к карточке');
   }
 });
 
@@ -177,13 +157,43 @@ router.delete('/:tagId', authMiddleware, async (req, res) => {
  *       200:
  *         description: Тег откреплен от карточки
  */
+// ВАЖНО: этот маршрут должен идти ДО '/:tagId', иначе Express примет
+// слово "remove-from-card" за id тега и вернёт ошибку.
 router.delete('/remove-from-card', authMiddleware, async (req, res) => {
   try {
     const { cardId, tagId } = req.body;
     const removed = await TagRepository.removeTagFromCard(cardId, tagId);
     res.json({ message: 'Тег откреплен от карточки', removed });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка открепления тега' });
+    sendError(res, e, 'Ошибка открепления тега');
+  }
+});
+
+/**
+ * @swagger
+ * /api/tags/{tagId}:
+ *   delete:
+ *     summary: Удалить тег из проекта полностью
+ *     tags: [Tags]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tagId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Тег полностью удален из проекта
+ */
+router.delete('/:tagId', authMiddleware, async (req, res) => {
+  try {
+    const deleted = await TagRepository.deleteTag(req.params.tagId);
+    if (!deleted) return res.status(404).json({ message: 'Тег не найден' });
+    res.json({ message: 'Тег успешно удален из проекта', id: req.params.tagId });
+  } catch (e) {
+    sendError(res, e, 'Ошибка удаления тега');
   }
 });
 
@@ -215,9 +225,10 @@ router.patch('/:tagId/details', authMiddleware, async (req, res) => {
   try {
     const { name, colorCode } = req.body;
     const updated = await TagRepository.updateTagDetails(req.params.tagId, { name, colorCode });
+    if (!updated) return res.status(404).json({ message: 'Тег не найден' });
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления тега' });
+    sendError(res, e, 'Ошибка обновления тега');
   }
 });
 
