@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { RoleRepository } from '../db/RoleRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { checkProjectAccess, checkRoleAccess } from '../middleware/rbacMiddleware.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = Router();
 
@@ -55,22 +57,22 @@ const router = Router();
  *       201:
  *         description: Роль создана
  */
-router.get('/project/:projectId', authMiddleware, async (req, res) => {
+router.get('/project/:projectId', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
   try {
     const roles = await RoleRepository.getProjectRoles(req.params.projectId);
     res.json(roles);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка получения ролей' });
+    sendError(res, e, 'Ошибка получения ролей');
   }
 });
 
-router.post('/project/:projectId', authMiddleware, async (req, res) => {
+router.post('/project/:projectId', authMiddleware, checkProjectAccess('ADMIN'), async (req, res) => {
   try {
     const { name } = req.body;
     const role = await RoleRepository.createProjectRole(req.params.projectId, name);
     res.status(201).json(role);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка создания роли' });
+    sendError(res, e, 'Ошибка создания роли');
   }
 });
 
@@ -131,23 +133,23 @@ router.post('/project/:projectId', authMiddleware, async (req, res) => {
  *       200:
  *         description: Право удалено из роли
  */
-router.post('/:roleId/rights', authMiddleware, async (req, res) => {
+router.post('/:roleId/rights', authMiddleware, checkRoleAccess('ADMIN'), async (req, res) => {
   try {
     const { accessRightId } = req.body;
     const added = await RoleRepository.addRightToRole(req.params.roleId, accessRightId);
-    res.status(201).json(added);
+    res.status(201).json(added ?? { message: 'Право уже есть у роли' });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка добавления права в роль' });
+    sendError(res, e, 'Ошибка добавления права в роль');
   }
 });
 
-router.delete('/:roleId/rights', authMiddleware, async (req, res) => {
+router.delete('/:roleId/rights', authMiddleware, checkRoleAccess('ADMIN'), async (req, res) => {
   try {
     const { accessRightId } = req.body;
     const removed = await RoleRepository.removeRightFromRole(req.params.roleId, accessRightId);
-    res.json(removed);
+    res.json(removed ?? { message: 'У роли не было этого права' });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка отзыва права у роли' });
+    sendError(res, e, 'Ошибка отзыва права у роли');
   }
 });
 
@@ -179,13 +181,22 @@ router.delete('/:roleId/rights', authMiddleware, async (req, res) => {
  *       201:
  *         description: Роль успешно назначена участнику
  */
-router.post('/assign-to-participant', authMiddleware, async (req, res) => {
+// roleId лежит в теле запроса, а не в URL: подставляем его в params для проверки прав
+const roleFromBody = (req, res, next) => {
+  req.params.roleId = req.body.roleId;
+  return checkRoleAccess('ADMIN')(req, res, next);
+};
+
+router.post('/assign-to-participant', authMiddleware, roleFromBody, async (req, res) => {
   try {
     const { participantId, roleId } = req.body;
+    const role = await RoleRepository.findById(roleId);
+    const check = await RoleRepository.participantBelongsToProject(role.project_id, participantId);
+    if (!check) return res.status(400).json({ message: 'Участник относится к другому проекту' });
     const assigned = await RoleRepository.assignRoleToParticipant(participantId, roleId);
-    res.status(201).json(assigned);
+    res.status(201).json(assigned ?? { message: 'Роль уже назначена' });
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка назначения роли участнику' });
+    sendError(res, e, 'Ошибка назначения роли участнику');
   }
 });
 
@@ -214,13 +225,64 @@ router.post('/assign-to-participant', authMiddleware, async (req, res) => {
  *     responses:
  *       200: { description: Имя роли изменено }
  */
-router.patch('/:roleId/name', authMiddleware, async (req, res) => {
+router.patch('/:roleId/name', authMiddleware, checkRoleAccess('ADMIN'), async (req, res) => {
   try {
     const { name } = req.body;
     const updated = await RoleRepository.updateRoleName(req.params.roleId, name);
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления названия роли' });
+    sendError(res, e, 'Ошибка обновления названия роли');
   }
 });
+
+/**
+ * @swagger
+ * /api/roles/access-rights:
+ *   get:
+ *     summary: Справочник прав доступа (READ, WRITE, EXECUTE, ADMIN) — для настройки ролей
+ *     tags: [Roles & RBAC]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "Массив {id, name}"
+ */
+router.get('/access-rights', authMiddleware, async (req, res) => {
+  try {
+    res.json(await RoleRepository.getAccessRights());
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения справочника прав');
+  }
+});
+
+/**
+ * @swagger
+ * /api/roles/{roleId}:
+ *   delete:
+ *     summary: Удалить роль проекта (право ADMIN). Нельзя удалить роль, если после этого в проекте не останется администратора
+ *     tags: [Roles & RBAC]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: roleId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Роль удалена
+ *       400:
+ *         description: Нельзя удалить последнего администратора
+ */
+router.delete('/:roleId', authMiddleware, checkRoleAccess('ADMIN'), async (req, res) => {
+  try {
+    const removed = await RoleRepository.deleteRole(req.params.roleId);
+    if (!removed) return res.status(404).json({ message: 'Роль не найдена' });
+    res.json({ message: 'Роль удалена', id: removed.id });
+  } catch (e) {
+    sendError(res, e, 'Ошибка удаления роли');
+  }
+});
+
 export default router;

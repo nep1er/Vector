@@ -1,109 +1,63 @@
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 import type { ProjectDetails } from '../types';
+import Modal from './Modal';
+import GeneralTab from './settings/GeneralTab';
+import MembersTab from './settings/MembersTab';
+import RolesTab from './settings/RolesTab';
+import TagsTab from './settings/TagsTab';
+
+export type SettingsTab = 'general' | 'members' | 'roles' | 'tags';
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'general', label: 'Общие' },
+  { id: 'members', label: 'Участники' },
+  { id: 'roles', label: 'Роли' },
+  { id: 'tags', label: 'Теги задач' },
+];
 
 interface Props {
   project: ProjectDetails;
+  initialTab?: SettingsTab;
   onClose: () => void;
+  /** Что-то изменилось (название, участники, роли, теги) — страница перезагружает данные */
   onSaved: () => Promise<void> | void;
 }
 
-export default function ProjectSettingsModal({ project, onClose, onSaved }: Props) {
-  const navigate = useNavigate();
-  const [title, setTitle] = useState(project.title);
-  const [description, setDescription] = useState(project.description ?? '');
-  const [confirmName, setConfirmName] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  const save = async (e: FormEvent) => {
-    e.preventDefault();
-    const cleanTitle = title.trim();
-    if (!cleanTitle) return setError('Введите название проекта');
-    setBusy(true);
-    setError('');
-    try {
-      await api.projects.update(project.id, { title: cleanTitle, description: description.trim() });
-      await onSaved();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось сохранить');
-      setBusy(false);
-    }
-  };
-
-  const remove = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      await api.projects.remove(project.id);
-      navigate('/', { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось удалить проект');
-      setBusy(false);
-    }
-  };
+export default function ProjectSettingsModal({ project, initialTab = 'general', onClose, onSaved }: Props) {
+  const { user } = useAuth();
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div
-        className="modal modal-wide"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <h2 id="settings-title">Настройки проекта</h2>
-
-        <form onSubmit={save}>
-          <label className="field">
-            <span>Название</span>
-            <input value={title} maxLength={150} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Описание</span>
-            <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </label>
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>
-              Закрыть
-            </button>
-            <button className="btn btn-primary" disabled={busy}>
-              Сохранить
-            </button>
-          </div>
-        </form>
-
-        <div className="danger-block">
-          <h3>Удаление проекта</h3>
-          <p className="muted">
-            Проект, все его задачи и доски будут удалены безвозвратно. Для подтверждения введите
-            название проекта.
-          </p>
-          <input
-            value={confirmName}
-            placeholder={project.title}
-            onChange={(e) => setConfirmName(e.target.value)}
-          />
+    <Modal title="Настройки проекта" onClose={onClose} wide>
+      <div className="tabs" role="tablist">
+        {TABS.map((t) => (
           <button
-            className="btn btn-danger"
-            onClick={remove}
-            disabled={busy || confirmName.trim() !== project.title}
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            className={tab === t.id ? 'tab active' : 'tab'}
+            onClick={() => setTab(t.id)}
           >
-            Удалить проект
+            {t.label}
           </button>
-        </div>
-
-        {error && <div className="notice notice-err">{error}</div>}
+        ))}
       </div>
-    </div>
+
+      <div className="tab-body">
+        {tab === 'general' && <GeneralTab project={project} onChanged={onSaved} />}
+        {tab === 'members' && (
+          <MembersTab projectId={project.id} currentUserId={user?.id ?? 0} onChanged={onSaved} />
+        )}
+        {tab === 'roles' && <RolesTab projectId={project.id} onChanged={onSaved} />}
+        {tab === 'tags' && <TagsTab projectId={project.id} onChanged={onSaved} />}
+      </div>
+
+      <div className="modal-actions">
+        <button className="btn btn-secondary" onClick={onClose}>
+          Закрыть
+        </button>
+      </div>
+    </Modal>
   );
 }

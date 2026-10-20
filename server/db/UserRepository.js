@@ -21,6 +21,21 @@ export class UserRepository {
     return res.rows[0];
   }
 
+  /**
+   * Находит пользователя по email (если в строке есть «@») или по имени пользователя.
+   * Возвращает только публичные поля. Используется для приглашений и заявок в друзья.
+   */
+  static async findByIdentifier(identifier) {
+    const value = String(identifier ?? '').trim();
+    if (!value) return undefined;
+    const column = value.includes('@') ? 'email' : 'username';
+    const res = await pool.query(
+      `SELECT id, username, email, avatar_url FROM users WHERE LOWER(${column}) = LOWER($1)`,
+      [value]
+    );
+    return res.rows[0];
+  }
+
   static async createUser(username, email, passwordHash) {
     const res = await pool.query(
       `INSERT INTO users (username, email, password_hash)

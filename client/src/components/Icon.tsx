@@ -27,7 +27,9 @@ export type IconName =
   | 'bell'
   | 'trash'
   | 'minus'
-  | 'roadmap';
+  | 'roadmap'
+  | 'users'
+  | 'user-plus';
 
 export default function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return (

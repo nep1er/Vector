@@ -7,7 +7,8 @@ async function seedDatabase() {
     console.log('🌱 Начинаем заново заполнение базы данных по точной DDL-схеме...');
     await client.query('BEGIN');
 
-    // 1. Очистка таблиц данных (справочники access_rights, task_type, card_status не трогаем!)
+    // 1. Очистка таблиц данных (справочники access_rights, task_type, card_status, task_status,
+    //    friend_status, invitation_status, notification_type не трогаем!)
     await client.query('TRUNCATE users, project CASCADE;');
 
     // 2. Создание пользователей
@@ -88,6 +89,21 @@ await client.query(
   `INSERT INTO assigned_roles (project_participant_id, project_role_id) VALUES ($1, $2)`,
   [partDev.rows[0].id, devRole.rows[0].id]
 );
+
+// Роль «Наблюдатель» (READ) — её получает каждый, кто принял приглашение в проект
+const observerRole = await client.query(
+  `INSERT INTO project_roles (project_id, name) VALUES ($1, 'Наблюдатель') RETURNING id`,
+  [projectId]
+);
+await client.query(
+  `INSERT INTO role_access_rights (project_role_id, access_right_id)
+   SELECT $1, id FROM access_rights WHERE name = 'READ'`,
+  [observerRole.rows[0].id]
+);
+await client.query(
+  `INSERT INTO assigned_roles (project_participant_id, project_role_id) VALUES ($1, $2)`,
+  [partPM.rows[0].id, observerRole.rows[0].id]
+);
     console.log('✅ Проект и ролевая модель RBAC сформированы');
 
     // 6. Создание Главной Корневой RoadMap (parent_roadmap_id IS NULL)
@@ -140,16 +156,34 @@ await client.query(
     );
     const cardId = cardRes.rows[0].id;
 
-    // 10. Создание тега и привязка к карточке
+    // 10. Тег КАНБАНА (kanban_tag) и привязка к карточке
     const tagRes = await client.query(
-      `INSERT INTO project_tag (project_id, name, color_code) 
+      `INSERT INTO kanban_tag (project_id, name, color_code) 
        VALUES ($1, 'Backend', '#4A90D9') RETURNING id`,
       [projectId]
     );
     await client.query(
-      `INSERT INTO tags_applies (project_tag_id, kanban_card_id) VALUES ($1, $2)`,
+      `INSERT INTO kanban_tags_applies (kanban_tag_id, kanban_card_id) VALUES ($1, $2)`,
       [tagRes.rows[0].id, cardId]
     );
+
+    // 11. Теги ЗАДАЧ (task_tag) — независимая система для этапов RoadMap/ToDo
+    const progTag = await client.query(
+      `INSERT INTO task_tag (project_id, name, color_code)
+       VALUES ($1, 'Программирование', '#4A90D9') RETURNING id`,
+      [projectId]
+    );
+    await client.query(
+      `INSERT INTO task_tag (project_id, name, color_code) VALUES ($1, 'Арт', '#E85D75')`,
+      [projectId]
+    );
+    await client.query(
+      `INSERT INTO task_tag_applies (task_id, task_tag_id, project_id) VALUES ($1, $2, $3)`,
+      [todoTaskId, progTag.rows[0].id, projectId]
+    );
+
+    // 12. Статус задачи (справочник task_status): 2 = «В процессе»
+    await client.query(`UPDATE task SET status_id = 2 WHERE id = $1`, [todoTaskId]);
 
     await client.query('COMMIT');
     console.log('🚀 БАЗА ДАННЫХ УСПЕШНО ЗАСЕЯНА НАЧАЛЬНЫМИ ДАННЫМИ!');

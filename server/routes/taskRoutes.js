@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { RoadmapRepository } from '../db/RoadmapRepository.js';
 import { TodoRepository } from '../db/TodoRepository.js';
 import { TaskRepository } from '../db/TaskRepository.js';
+import { UserRepository } from '../db/UserRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { checkProjectAccess, checkTaskAccess } from '../middleware/rbacMiddleware.js';
 import { sendError } from '../utils/httpError.js';
@@ -291,6 +292,114 @@ router.patch('/:taskId/dates', authMiddleware, checkTaskAccess('EXECUTE'), async
     res.json(updated);
   } catch (e) {
     sendError(res, e, 'Ошибка обновления дат задачи');
+  }
+});
+
+/**
+ * @swagger
+ * /api/tasks/statuses:
+ *   get:
+ *     summary: Справочник статусов задач (Выполнено, В процессе, В плане, Просрочено, Заморожено, Неактивно)
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "Массив {id, code, name}"
+ */
+router.get('/statuses', authMiddleware, async (req, res) => {
+  try {
+    res.json(await TaskRepository.getStatuses());
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения статусов');
+  }
+});
+
+/**
+ * @swagger
+ * /api/tasks/{taskId}/status:
+ *   patch:
+ *     summary: Выставить статус задачи (только руководитель — право EXECUTE). Остальные участники проекта получают уведомление.
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [statusId]
+ *             properties:
+ *               statusId: { type: integer, example: 2 }
+ *     responses:
+ *       200: { description: Статус изменён }
+ *       400: { description: Такого статуса не существует }
+ *       403: { description: Недостаточно прав }
+ *       404: { description: Задача не найдена }
+ */
+router.patch('/:taskId/status', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
+  try {
+    const updated = await TaskRepository.updateStatus(req.params.taskId, req.body.statusId);
+    if (!updated) return res.status(404).json({ message: 'Задача не найдена' });
+    // Уведомление — побочный эффект: его сбой не должен отменять смену статуса
+    try {
+      const actor = await UserRepository.findById(req.user.id);
+      await TaskRepository.notifyStatusChange(updated, actor);
+    } catch (notifyError) {
+      console.error('Не удалось создать уведомления о смене статуса:', notifyError);
+    }
+    res.json(updated);
+  } catch (e) {
+    sendError(res, e, 'Ошибка смены статуса задачи');
+  }
+});
+
+/**
+ * @swagger
+ * /api/tasks/projects/{projectId}/search:
+ *   get:
+ *     summary: Плоский список задач проекта с фильтрами по тегам, статусам и времени
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *       - { in: query, name: tagIds, schema: { type: string, example: "1,2" }, description: "ID тегов задач через запятую" }
+ *       - { in: query, name: tagMode, schema: { type: string, enum: [any, all], default: any }, description: "any — есть хотя бы один тег, all — все перечисленные" }
+ *       - { in: query, name: statusIds, schema: { type: string, example: "2,4" }, description: "ID статусов через запятую" }
+ *       - { in: query, name: from, schema: { type: string, example: "2026-03-01" }, description: "Задачи, заканчивающиеся не раньше этой даты" }
+ *       - { in: query, name: to, schema: { type: string, example: "2026-06-30" }, description: "Задачи, начинающиеся не позже этой даты" }
+ *     responses:
+ *       200: { description: "Массив задач с полями status_id и tags" }
+ */
+router.get('/projects/:projectId/search', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
+  try {
+    const ids = (value) =>
+      String(value ?? '')
+        .split(',')
+        .filter((x) => x.trim() !== '')
+        .map(Number);
+    const tagIds = ids(req.query.tagIds);
+    const statusIds = ids(req.query.statusIds);
+    if ([...tagIds, ...statusIds].some((n) => !Number.isInteger(n))) {
+      return res.status(400).json({ message: 'tagIds и statusIds — целые числа через запятую' });
+    }
+    const tasks = await TaskRepository.searchTasks(req.params.projectId, {
+      tagIds,
+      tagMode: req.query.tagMode === 'all' ? 'all' : 'any',
+      statusIds,
+      from: req.query.from,
+      to: req.query.to,
+    });
+    res.json(tasks);
+  } catch (e) {
+    sendError(res, e, 'Ошибка поиска задач');
   }
 });
 

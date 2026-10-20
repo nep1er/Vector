@@ -11,7 +11,13 @@ import type {
   Project,
   ProjectDetails,
   ProjectRole,
-  ProjectTag,
+  KanbanTag,
+  AccessRight,
+  AppNotification,
+  Invitation,
+  Participant,
+  TaskStatus,
+  TaskTag,
   Task,
   TaskNode,
   User,
@@ -55,7 +61,7 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
   unauthorizedHandler = fn;
 }
 
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
@@ -143,6 +149,24 @@ const projects = {
   addParticipant: (projectId: number, userId: number) =>
     request<unknown>('POST', `/api/projects/${projectId}/participants`, { userId }),
 
+  /** Участники с аватарами и ролями */
+  participants: (projectId: number) =>
+    request<Participant[]>('GET', `/api/projects/${projectId}/participants`),
+
+  /** Сменить роль участника (делает её единственной), право ADMIN */
+  setParticipantRole: (projectId: number, userId: number, roleId: number) =>
+    request<unknown>('PATCH', `/api/projects/${projectId}/participants/${userId}/role`, { roleId }),
+
+  /** Пригласить по e-mail / имени пользователя. Участник появится после принятия (роль «Наблюдатель») */
+  invite: (projectId: number, identifier: string) =>
+    request<Invitation>('POST', `/api/projects/${projectId}/invitations`, { identifier }),
+
+  invitations: (projectId: number) =>
+    request<Invitation[]>('GET', `/api/projects/${projectId}/invitations`),
+
+  cancelInvitation: (projectId: number, invitationId: number) =>
+    request<{ message: string }>('DELETE', `/api/projects/${projectId}/invitations/${invitationId}`),
+
   removeParticipant: (projectId: number, userId: number) =>
     request<{ message: string }>('DELETE', `/api/projects/${projectId}/participants/${userId}`),
 };
@@ -183,6 +207,13 @@ const tasks = {
 
   updateDates: (taskId: number, startDate?: string, endDate?: string) =>
     request<Task>('PATCH', `/api/tasks/${taskId}/dates`, { startDate, endDate }),
+
+  /** Справочник статусов (Выполнено, В процессе, ...) */
+  statuses: () => request<TaskStatus[]>('GET', '/api/tasks/statuses'),
+
+  /** Сменить статус — только руководитель (право EXECUTE) */
+  setStatus: (taskId: number, statusId: number) =>
+    request<Task>('PATCH', `/api/tasks/${taskId}/status`, { statusId }),
 };
 
 // ---------------------------------------------------------------------------
@@ -256,30 +287,91 @@ const roles = {
   removeRight: (roleId: number, accessRightId: number) =>
     request<unknown>('DELETE', `/api/roles/${roleId}/rights`, { accessRightId }),
 
+  remove: (roleId: number) => request<{ message: string }>('DELETE', `/api/roles/${roleId}`),
+
+  accessRights: () => request<AccessRight[]>('GET', '/api/roles/access-rights'),
+
   assignToParticipant: (participantId: number, roleId: number) =>
     request<unknown>('POST', '/api/roles/assign-to-participant', { participantId, roleId }),
 };
 
 // ---------------------------------------------------------------------------
-// TAGS  /api/tags
+// KANBAN TAGS  /api/kanban-tags   (теги карточек Канбана)
 // ---------------------------------------------------------------------------
-const tags = {
+const kanbanTags = {
   listByProject: (projectId: number) =>
-    request<ProjectTag[]>('GET', `/api/tags/project/${projectId}`),
+    request<KanbanTag[]>('GET', `/api/kanban-tags/project/${projectId}`),
 
   create: (projectId: number, name: string, color?: string) =>
-    request<ProjectTag>('POST', `/api/tags/project/${projectId}`, { name, color }),
+    request<KanbanTag>('POST', `/api/kanban-tags/project/${projectId}`, { name, color }),
 
   update: (tagId: number, data: { name?: string; colorCode?: string }) =>
-    request<ProjectTag>('PATCH', `/api/tags/${tagId}/details`, data),
+    request<KanbanTag>('PATCH', `/api/kanban-tags/${tagId}/details`, data),
 
-  remove: (tagId: number) => request<{ message: string }>('DELETE', `/api/tags/${tagId}`),
+  remove: (tagId: number) => request<{ message: string }>('DELETE', `/api/kanban-tags/${tagId}`),
 
   applyToCard: (cardId: number, tagId: number) =>
-    request<unknown>('POST', '/api/tags/apply', { cardId, tagId }),
+    request<unknown>('POST', '/api/kanban-tags/apply', { cardId, tagId }),
 
   removeFromCard: (cardId: number, tagId: number) =>
-    request<unknown>('DELETE', '/api/tags/remove-from-card', { cardId, tagId }),
+    request<unknown>('DELETE', '/api/kanban-tags/remove-from-card', { cardId, tagId }),
 };
 
-export const api = { auth, projects, tasks, kanban, roles, tags };
+// ---------------------------------------------------------------------------
+// TASK TAGS  /api/task-tags   (теги задач RoadMap; одна задача — много тегов)
+// ---------------------------------------------------------------------------
+const taskTags = {
+  listByProject: (projectId: number) =>
+    request<TaskTag[]>('GET', `/api/task-tags/project/${projectId}`),
+
+  create: (projectId: number, name: string, color?: string) =>
+    request<TaskTag>('POST', `/api/task-tags/project/${projectId}`, { name, color }),
+
+  update: (tagId: number, data: { name?: string; colorCode?: string }) =>
+    request<TaskTag>('PATCH', `/api/task-tags/${tagId}`, data),
+
+  remove: (tagId: number) => request<{ message: string }>('DELETE', `/api/task-tags/${tagId}`),
+
+  forTask: (taskId: number) => request<TaskTag[]>('GET', `/api/task-tags/tasks/${taskId}`),
+
+  /** Полностью заменяет набор тегов задачи */
+  setForTask: (taskId: number, tagIds: number[]) =>
+    request<TaskTag[]>('PUT', `/api/task-tags/tasks/${taskId}`, { tagIds }),
+};
+
+// ---------------------------------------------------------------------------
+// NOTIFICATIONS  /api/notifications,  INVITATIONS  /api/invitations
+// ---------------------------------------------------------------------------
+const notifications = {
+  list: () => request<AppNotification[]>('GET', '/api/notifications'),
+  unreadCount: () => request<{ count: number }>('GET', '/api/notifications/unread-count'),
+  markRead: (id: number) => request<unknown>('PATCH', `/api/notifications/${id}/read`),
+  readAll: () => request<unknown>('POST', '/api/notifications/read-all'),
+  remove: (id: number) => request<unknown>('DELETE', `/api/notifications/${id}`),
+};
+
+const invitations = {
+  /** Принять приглашение → пользователь становится участником с ролью «Наблюдатель» */
+  accept: (invitationId: number) =>
+    request<unknown>('POST', `/api/invitations/${invitationId}/accept`),
+  decline: (invitationId: number) =>
+    request<unknown>('POST', `/api/invitations/${invitationId}/decline`),
+};
+
+const friends = {
+  accept: (friendId: number) => request<unknown>('POST', `/api/friends/${friendId}/accept`),
+  remove: (friendId: number) => request<unknown>('DELETE', `/api/friends/${friendId}`),
+};
+
+export const api = {
+  auth,
+  projects,
+  tasks,
+  kanban,
+  roles,
+  kanbanTags,
+  taskTags,
+  notifications,
+  invitations,
+  friends,
+};

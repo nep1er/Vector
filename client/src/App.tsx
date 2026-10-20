@@ -31,10 +31,12 @@ export default function App() {
       </Route>
 
       <Route element={<Protected />}>
+        {/* Внутри проекта глобальное меню скрыто: у проекта свой изолированный экран */}
+        <Route path="projects/:projectId" element={<ProjectPage />} />
+        <Route path="projects/:projectId/roadmap/:roadmapId" element={<ProjectPage />} />
+
         <Route element={<Layout />}>
           <Route index element={<ProjectsPage />} />
-          <Route path="projects/:projectId" element={<ProjectPage />} />
-          <Route path="projects/:projectId/roadmap/:roadmapId" element={<ProjectPage />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="profile" element={<ProfilePage />} />

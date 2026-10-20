@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TaskNode } from '../types';
 import { dayIndex, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
+import { statusById } from '../utils/status';
 import Icon from './Icon';
 
 const ZOOMS = [4, 7, 12, 20, 32, 48, 72]; // пикселей на день
@@ -188,13 +189,20 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
                     top: LANE_GAP + lane * (LANE_H + LANE_GAP),
                     height: LANE_H,
                   }}
-                  title={`${task.title}\n${formatDay(s)} — ${formatDay(e)}`}
+                  title={`${task.title}\n${formatDay(s)} — ${formatDay(e)}\n${statusById(task.status_id).name}${
+                    task.tags.length ? `\n# ${task.tags.map((t) => t.name).join(', ')}` : ''
+                  }`}
                   onClick={(ev) => {
                     ev.stopPropagation();
                     onSelect(task.id);
                   }}
                   onDoubleClick={() => isRoadmap && onOpen(task)}
                 >
+                  <i
+                    className="clip-status"
+                    style={{ background: statusById(task.status_id).color }}
+                    aria-label={statusById(task.status_id).name}
+                  />
                   <span className="clip-title">
                     <Icon name={isRoadmap ? 'roadmap' : 'tasks'} size={14} />
                     {task.title}

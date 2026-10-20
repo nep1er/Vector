@@ -11,7 +11,12 @@ import projectRoutes from './routes/projectRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
 import kanbanRoutes from './routes/kanbanRoutes.js';
 import roleRoutes from './routes/roleRoutes.js';
-import tagRoutes from './routes/tagRoutes.js';
+import kanbanTagRoutes from './routes/kanbanTagRoutes.js';
+import taskTagRoutes from './routes/taskTagRoutes.js';
+import invitationRoutes from './routes/invitationRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import storageRoutes from './routes/storageRoutes.js';
+import friendRoutes from './routes/friendRoutes.js';
 
 dotenv.config();
 
@@ -48,7 +53,12 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/kanban', kanbanRoutes);
 app.use('/api/roles', roleRoutes);
-app.use('/api/tags', tagRoutes);
+app.use('/api/kanban-tags', kanbanTagRoutes); // теги Канбана (бывш. /api/tags)
+app.use('/api/task-tags', taskTagRoutes); // теги задач RoadMap/ToDo
+app.use('/api/invitations', invitationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/storage', storageRoutes);
+app.use('/api/friends', friendRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 API Сервер запущен на порту ${PORT}`);

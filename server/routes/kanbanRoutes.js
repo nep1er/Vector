@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { KanbanRepository } from '../db/KanbanRepository.js';
+import { CommentRepository } from '../db/CommentRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { checkCardAccess, checkCommentAccess } from '../middleware/rbacMiddleware.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = Router();
 
@@ -458,6 +461,119 @@ router.delete('/cards/:cardId/participants', authMiddleware, async (req, res) =>
     res.json(removed);
   } catch (e) {
     res.status(500).json({ message: 'Ошибка удаления участника с карточки' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// КОММЕНТАРИИ К КАРТОЧКАМ (card_comments)
+// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * /api/kanban/cards/{cardId}/comments:
+ *   get:
+ *     summary: Комментарии карточки по порядку создания (право READ)
+ *     tags: [Kanban]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "Массив {id, content, author_id, author_name, created_at, updated_at}" }
+ *   post:
+ *     summary: Добавить комментарий (право WRITE). Участники карточки получают уведомление CARD_COMMENT
+ *     tags: [Kanban]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content: { type: string, example: "Готово, посмотрите PR" }
+ *     responses:
+ *       201: { description: Комментарий добавлен }
+ */
+router.get('/cards/:cardId/comments', authMiddleware, checkCardAccess('READ'), async (req, res) => {
+  try {
+    res.json(await CommentRepository.listByCard(req.params.cardId));
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения комментариев');
+  }
+});
+
+router.post('/cards/:cardId/comments', authMiddleware, checkCardAccess('WRITE'), async (req, res) => {
+  try {
+    const comment = await CommentRepository.create(req.params.cardId, req.user.id, req.body.content);
+    res.status(201).json(comment);
+  } catch (e) {
+    sendError(res, e, 'Ошибка добавления комментария');
+  }
+});
+
+/**
+ * @swagger
+ * /api/kanban/comments/{commentId}:
+ *   patch:
+ *     summary: Изменить свой комментарий (только автор)
+ *     tags: [Kanban]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: commentId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content: { type: string }
+ *     responses:
+ *       200: { description: Комментарий изменён }
+ *       403: { description: Можно изменять только свои комментарии }
+ *   delete:
+ *     summary: Удалить комментарий (автор или администратор проекта)
+ *     tags: [Kanban]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: commentId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Комментарий удалён }
+ *       403: { description: Недостаточно прав }
+ */
+router.patch('/comments/:commentId', authMiddleware, checkCommentAccess('WRITE'), async (req, res) => {
+  try {
+    const comment = await CommentRepository.findById(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Комментарий не найден' });
+    if (comment.author_id !== req.user.id) {
+      return res.status(403).json({ message: 'Можно изменять только свои комментарии' });
+    }
+    res.json(await CommentRepository.update(req.params.commentId, req.body.content));
+  } catch (e) {
+    sendError(res, e, 'Ошибка изменения комментария');
+  }
+});
+
+router.delete('/comments/:commentId', authMiddleware, checkCommentAccess('WRITE'), async (req, res) => {
+  try {
+    const comment = await CommentRepository.findById(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Комментарий не найден' });
+    const isAdmin = req.userPermissions.includes('ADMIN');
+    if (comment.author_id !== req.user.id && !isAdmin) {
+      return res.status(403).json({ message: 'Удалить чужой комментарий может только администратор' });
+    }
+    await CommentRepository.remove(req.params.commentId);
+    res.json({ message: 'Комментарий удалён', id: comment.id });
+  } catch (e) {
+    sendError(res, e, 'Ошибка удаления комментария');
   }
 });
 

@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
+import AddMemberModal from '../components/AddMemberModal';
 import CreateTaskModal from '../components/CreateTaskModal';
 import Icon from '../components/Icon';
 import ProjectSettingsModal from '../components/ProjectSettingsModal';
+import type { SettingsTab } from '../components/ProjectSettingsModal';
+import ProjectShell from '../components/ProjectShell';
+import RoadmapFilters from '../components/RoadmapFilters';
 import TaskInspector from '../components/TaskInspector';
 import Timeline from '../components/Timeline';
-import type { ProjectDetails, TaskNode } from '../types';
+import type { Participant, ProjectDetails, TaskNode, TaskTag } from '../types';
+import { EMPTY_FILTERS, filtersActive, matchesFilters } from '../utils/status';
+import type { TaskFilters } from '../utils/status';
 
 /** Путь от корня дерева до узла с нужным id */
 function findPath(nodes: TaskNode[], id: number, trail: TaskNode[] = []): TaskNode[] | null {
@@ -30,13 +36,24 @@ export default function ProjectPage() {
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [projectTags, setProjectTags] = useState<TaskTag[]>([]);
+  const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
 
   const load = useCallback(async () => {
     try {
-      const [p, t] = await Promise.all([api.projects.get(pid), api.tasks.tree(pid)]);
+      const [p, t, members, tags] = await Promise.all([
+        api.projects.get(pid),
+        api.tasks.tree(pid),
+        api.projects.participants(pid),
+        api.taskTags.listByProject(pid),
+      ]);
       setProject(p);
       setTree(t);
+      setParticipants(members);
+      setProjectTags(tags);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить проект');
@@ -48,18 +65,26 @@ export default function ProjectPage() {
   useEffect(() => {
     setLoading(true);
     setSelectedId(null);
+    setFilters(EMPTY_FILTERS);
     load();
   }, [load]);
 
-  if (loading) return <div className="muted">Загрузка…</div>;
+  const filterTasks = useMemo(
+    () => (nodes: TaskNode[]) => nodes.filter((t) => matchesFilters(t, filters)),
+    [filters],
+  );
+
+  if (loading) return <div className="pcontent muted">Загрузка…</div>;
 
   if (error || !project) {
     return (
-      <div className="notice notice-err">
-        {error || 'Проект не найден'}{' '}
-        <Link to="/" className="link-btn">
-          К проектам
-        </Link>
+      <div className="pcontent">
+        <div className="notice notice-err">
+          {error || 'Проект не найден'}{' '}
+          <Link to="/" className="link-btn">
+            К проектам
+          </Link>
+        </div>
       </div>
     );
   }
@@ -73,63 +98,60 @@ export default function ProjectPage() {
 
   if (!root || !current || current.type !== 'ROADMAP' || !path) {
     return (
-      <div className="notice notice-err">
-        Этап не найден{' '}
-        <Link to={`/projects/${pid}`} className="link-btn">
-          К главной RoadMap
-        </Link>
+      <div className="pcontent">
+        <div className="notice notice-err">
+          Этап не найден{' '}
+          <Link to={`/projects/${pid}`} className="link-btn">
+            К главной RoadMap
+          </Link>
+        </div>
       </div>
     );
   }
 
   const openRoadmap = (task: TaskNode) => navigate(`/projects/${pid}/roadmap/${task.id}`);
+  const visible = filterTasks(current.children);
   const selected = current.children.find((t) => t.id === selectedId) ?? null;
   const isRoot = current.id === root.id;
 
-  return (
-    <>
-      <nav className="crumbs" aria-label="Путь">
-        <Link to="/">Проекты</Link>
-        <span className="crumb-sep">/</span>
-        {isRoot ? (
-          <span className="crumb-current">{project.title}</span>
-        ) : (
-          <Link to={`/projects/${pid}`}>{project.title}</Link>
-        )}
-        {path.slice(1).map((node, i, arr) => (
-          <span key={node.id} className="crumb-group">
-            <span className="crumb-sep">/</span>
-            {i === arr.length - 1 ? (
-              <span className="crumb-current">{node.title}</span>
-            ) : (
-              <Link to={`/projects/${pid}/roadmap/${node.id}`}>{node.title}</Link>
-            )}
-          </span>
-        ))}
-      </nav>
+  const crumbs = [
+    { label: 'Проекты', to: '/' },
+    isRoot
+      ? { label: project.title }
+      : { label: project.title, to: `/projects/${pid}` },
+    ...path.slice(1).map((node, i, arr) => ({
+      label: node.title,
+      to: i === arr.length - 1 ? undefined : `/projects/${pid}/roadmap/${node.id}`,
+    })),
+  ];
 
+  return (
+    <ProjectShell
+      crumbs={crumbs}
+      participants={participants}
+      canInvite={can('ADMIN')}
+      canAddTask={can('WRITE') || can('EXECUTE')}
+      canSettings={can('ADMIN')}
+      onParticipants={() => (can('ADMIN') ? setSettingsTab('members') : undefined)}
+      onAddMember={() => setShowAddMember(true)}
+      onAddTask={() => setShowCreate(true)}
+      onSettings={() => setSettingsTab('general')}
+    >
       <div className="page-head">
         <h1>{isRoot ? project.title : current.title}</h1>
-        <div className="page-actions">
-          {can('ADMIN') && (
-            <button className="btn btn-secondary" onClick={() => setShowSettings(true)}>
-              <Icon name="settings" size={18} />
-              Настройки
-            </button>
-          )}
-          {(can('WRITE') || can('EXECUTE')) && (
-            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-              <Icon name="plus" size={18} />
-              Добавить задачу
-            </button>
-          )}
-        </div>
       </div>
+
+      <RoadmapFilters tags={projectTags} value={filters} onChange={setFilters} />
+      {filtersActive(filters) && (
+        <p className="muted hint">
+          Показано задач: {visible.length} из {current.children.length}
+        </p>
+      )}
 
       <div className={selected ? 'roadmap-layout has-inspector' : 'roadmap-layout'}>
         <Timeline
           key={current.id}
-          tasks={current.children}
+          tasks={visible}
           range={{ start: current.start_date, end: current.end_date }}
           selectedId={selectedId}
           onSelect={setSelectedId}
@@ -139,6 +161,7 @@ export default function ProjectPage() {
           <TaskInspector
             task={selected}
             canEdit={can('EXECUTE')}
+            projectTags={projectTags}
             onChanged={load}
             onClose={() => setSelectedId(null)}
             onOpen={openRoadmap}
@@ -160,13 +183,18 @@ export default function ProjectPage() {
         />
       )}
 
-      {showSettings && (
+      {showAddMember && (
+        <AddMemberModal projectId={pid} onClose={() => setShowAddMember(false)} onInvited={load} />
+      )}
+
+      {settingsTab && (
         <ProjectSettingsModal
           project={project}
-          onClose={() => setShowSettings(false)}
+          initialTab={settingsTab}
+          onClose={() => setSettingsTab(null)}
           onSaved={load}
         />
       )}
-    </>
+    </ProjectShell>
   );
 }

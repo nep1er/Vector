@@ -2,7 +2,12 @@
 const UNIQUE_MESSAGES = {
   users_email_key: 'Этот email уже используется',
   users_username_key: 'Это имя пользователя уже занято',
-  uk_project_tag: 'Тег с таким названием уже есть в проекте',
+  uk_kanban_tag: 'Тег Канбана с таким названием уже есть в проекте',
+  uk_task_tag: 'Тег задач с таким названием уже есть в проекте',
+  uk_project_storage: 'Раздел с таким названием уже есть в проекте',
+  uk_friends_pair: 'Заявка или дружба с этим пользователем уже существует',
+  uk_invitation_pending_user: 'Этому пользователю приглашение уже отправлено',
+  uk_invitation_pending_email: 'На этот email приглашение уже отправлено',
   uk_project_role: 'Роль с таким названием уже есть в проекте',
   uk_project_user: 'Пользователь уже участвует в проекте',
 };
@@ -28,7 +33,7 @@ export function sendError(res, error, fallbackMessage = 'Внутренняя о
     case '23503': // foreign_key_violation
       return res.status(400).json({ message: 'Связанная запись не найдена' });
     case '23514': // check_violation (например, start_date > end_date)
-      return res.status(400).json({ message: 'Данные нарушают ограничение (проверьте даты)' });
+      return res.status(400).json({ message: 'Данные нарушают ограничение (проверьте даты и формат полей)' });
     case '23502': // not_null_violation
       return res.status(400).json({ message: 'Не заполнено обязательное поле' });
     case '22P02': // invalid_text_representation

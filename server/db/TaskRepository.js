@@ -1,7 +1,21 @@
 import { pool } from '../config/db.js';
+import { NotificationRepository } from './NotificationRepository.js';
 
 const TASK_COLUMNS =
-  'id, project_id, type, title, description, start_date, end_date, parent_roadmap_id';
+  'id, project_id, type, title, description, start_date, end_date, parent_roadmap_id, status_id';
+
+// То же с алиасом t — для запросов с JOIN
+const TASK_COLUMNS_T = TASK_COLUMNS.split(', ')
+  .map((c) => `t.${c}`)
+  .join(', ');
+
+// Теги задачи одним JSON-массивом (task_tag через task_tag_applies)
+const TAGS_AGG = `
+  COALESCE(
+    json_agg(json_build_object('id', tg.id, 'name', tg.name, 'color_code', tg.color_code)
+             ORDER BY tg.name) FILTER (WHERE tg.id IS NOT NULL),
+    '[]'::json
+  ) AS tags`;
 
 const fmt = (d) => new Date(d).toISOString().slice(0, 10);
 
@@ -169,11 +183,15 @@ export class TaskRepository {
    * Один запрос по проекту + сборка дерева в памяти — быстрее рекурсивного SQL.
    */
   static async getProjectTree(projectId) {
+    // Каждая задача приходит со статусом (status_id) и массивом тегов (tags)
     const res = await pool.query(
-      `SELECT ${TASK_COLUMNS}
-       FROM task
-       WHERE project_id = $1
-       ORDER BY start_date NULLS LAST, id;`,
+      `SELECT ${TASK_COLUMNS_T}, ${TAGS_AGG}
+       FROM task t
+       LEFT JOIN task_tag_applies a ON a.task_id = t.id
+       LEFT JOIN task_tag tg ON tg.id = a.task_tag_id
+       WHERE t.project_id = $1
+       GROUP BY t.id
+       ORDER BY t.start_date NULLS LAST, t.id;`,
       [projectId]
     );
 
@@ -268,6 +286,95 @@ export class TaskRepository {
       [newStart, newEnd, taskId]
     );
     return res.rows[0];
+  }
+
+  // =========================================================================
+  // СТАТУСЫ И ФИЛЬТРЫ
+  // =========================================================================
+
+  /** Справочник статусов задач (task_status) */
+  static async getStatuses() {
+    const res = await pool.query('SELECT id, code, name FROM task_status ORDER BY id;');
+    return res.rows;
+  }
+
+  /** Меняет статус задачи. Права (руководитель = EXECUTE) проверяет роут. */
+  static async updateStatus(taskId, statusId) {
+    const id = Number(statusId);
+    if (!Number.isInteger(id)) throw new Error('400: Укажите statusId');
+    const exists = await pool.query('SELECT 1 FROM task_status WHERE id = $1;', [id]);
+    if (exists.rows.length === 0) throw new Error('400: Такого статуса не существует');
+
+    const res = await pool.query(
+      `UPDATE task SET status_id = $1 WHERE id = $2 RETURNING ${TASK_COLUMNS};`,
+      [id, taskId]
+    );
+    return res.rows[0];
+  }
+
+  /** Уведомляет остальных участников проекта о смене статуса (TASK_STATUS_CHANGED) */
+  static async notifyStatusChange(task, actor) {
+    const status = await pool.query('SELECT name FROM task_status WHERE id = $1;', [task.status_id]);
+    const recipients = await pool.query(
+      'SELECT user_id FROM project_participants WHERE project_id = $1 AND user_id <> $2;',
+      [task.project_id, actor.id]
+    );
+    await NotificationRepository.createMany(
+      recipients.rows.map((r) => r.user_id),
+      'TASK_STATUS_CHANGED',
+      {
+        project_id: task.project_id,
+        task_id: task.id,
+        task_title: task.title,
+        status_id: task.status_id,
+        status_name: status.rows[0]?.name ?? '',
+        actor_id: actor.id,
+        actor_name: actor.username,
+      }
+    );
+  }
+
+  /**
+   * Плоский поиск задач проекта с фильтрами (для API Desktop/Mobile; сайт фильтрует дерево на клиенте).
+   *  - tagIds    — задачи, у которых есть хотя бы один из тегов (tagMode 'all' — все перечисленные)
+   *  - statusIds — задачи с одним из статусов
+   *  - from / to — задачи, чьи даты пересекаются с интервалом [from, to]
+   */
+  static async searchTasks(projectId, { tagIds = [], tagMode = 'any', statusIds = [], from, to } = {}) {
+    const conditions = ['t.project_id = $1'];
+    const params = [projectId];
+    const add = (value) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+
+    if (statusIds.length > 0) conditions.push(`t.status_id = ANY(${add(statusIds)}::int[])`);
+
+    if (tagIds.length > 0) {
+      const ph = add(tagIds);
+      conditions.push(
+        tagMode === 'all'
+          ? `(SELECT COUNT(DISTINCT x.task_tag_id) FROM task_tag_applies x
+              WHERE x.task_id = t.id AND x.task_tag_id = ANY(${ph}::bigint[])) = ${tagIds.length}`
+          : `EXISTS (SELECT 1 FROM task_tag_applies x
+                     WHERE x.task_id = t.id AND x.task_tag_id = ANY(${ph}::bigint[]))`
+      );
+    }
+    // Пересечение интервалов: задача кончается не раньше from и начинается не позже to
+    if (from) conditions.push(`(t.end_date IS NULL OR t.end_date >= ${add(from)}::timestamptz)`);
+    if (to) conditions.push(`(t.start_date IS NULL OR t.start_date <= ${add(to)}::timestamptz)`);
+
+    const res = await pool.query(
+      `SELECT ${TASK_COLUMNS_T}, ${TAGS_AGG}
+       FROM task t
+       LEFT JOIN task_tag_applies a ON a.task_id = t.id
+       LEFT JOIN task_tag tg ON tg.id = a.task_tag_id
+       WHERE ${conditions.join(' AND ')}
+       GROUP BY t.id
+       ORDER BY t.start_date NULLS LAST, t.id;`,
+      params
+    );
+    return res.rows;
   }
 
   // =========================================================================

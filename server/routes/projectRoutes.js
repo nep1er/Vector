@@ -1,5 +1,8 @@
 import { Router } from 'express';
+import { InvitationRepository } from '../db/InvitationRepository.js';
 import { ProjectRepository } from '../db/ProjectRepository.js';
+import { RoleRepository } from '../db/RoleRepository.js';
+import { UserRepository } from '../db/UserRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { checkProjectAccess } from '../middleware/rbacMiddleware.js';
 import { sendError } from '../utils/httpError.js';
@@ -173,7 +176,7 @@ router.delete('/:projectId', authMiddleware, checkProjectAccess('ADMIN'), async 
  * @swagger
  * /api/projects/{projectId}/participants:
  *   post:
- *     summary: Добавить участника в проект (право ADMIN)
+ *     summary: Добавить участника в проект напрямую, без приглашения (право ADMIN). Получает роль «Наблюдатель». Сайт использует приглашения — см. /invitations
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -248,6 +251,165 @@ router.delete(
       res.json({ message: 'Участник успешно исключен из проекта', userId });
     } catch (e) {
       sendError(res, e, 'Ошибка при исключении участника');
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/projects/{projectId}/participants:
+ *   get:
+ *     summary: Участники проекта с их ролями (право READ) — для панели аватарок и вкладки «Участники»
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200:
+ *         description: "Массив {participant_id, user_id, username, email, avatar_url, roles: [{id, name}]}"
+ */
+router.get('/:projectId/participants', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
+  try {
+    res.json(await ProjectRepository.getParticipants(req.params.projectId));
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения участников');
+  }
+});
+
+/**
+ * @swagger
+ * /api/projects/{projectId}/participants/{userId}/role:
+ *   patch:
+ *     summary: Сменить роль участника — делает выбранную роль единственной (право ADMIN)
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *       - { in: path, name: userId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleId]
+ *             properties:
+ *               roleId: { type: integer, example: 2 }
+ *     responses:
+ *       200: { description: Роль изменена }
+ *       400: { description: Нельзя снять права у последнего администратора }
+ *       404: { description: Участник или роль не найдены }
+ */
+router.patch(
+  '/:projectId/participants/:userId/role',
+  authMiddleware,
+  checkProjectAccess('ADMIN'),
+  async (req, res) => {
+    try {
+      const { projectId, userId } = req.params;
+      const roleId = Number(req.body.roleId);
+      if (!Number.isInteger(roleId)) return res.status(400).json({ message: 'Укажите roleId' });
+
+      const participants = await ProjectRepository.getParticipants(projectId);
+      const participant = participants.find((p) => p.user_id === Number(userId));
+      if (!participant) return res.status(404).json({ message: 'Участник не найден в проекте' });
+
+      await RoleRepository.setParticipantRole(Number(projectId), participant.participant_id, roleId);
+      res.json({ message: 'Роль участника изменена', userId: Number(userId), roleId });
+    } catch (e) {
+      sendError(res, e, 'Ошибка смены роли участника');
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/projects/{projectId}/invitations:
+ *   post:
+ *     summary: Пригласить в проект (право ADMIN). Приглашённый получает уведомление PROJECT_INVITATION; при принятии становится «Наблюдателем»
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               identifier: { type: string, example: "dev@vector.ru", description: "email или имя пользователя" }
+ *               userId: { type: integer, description: "Вместо identifier" }
+ *     responses:
+ *       201: { description: Приглашение отправлено }
+ *       404: { description: Пользователь не найден }
+ *       409: { description: Уже участник или приглашение уже отправлено }
+ *   get:
+ *     summary: Приглашения проекта, ожидающие ответа (право ADMIN)
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Массив приглашений }
+ */
+router.post('/:projectId/invitations', authMiddleware, checkProjectAccess('ADMIN'), async (req, res) => {
+  try {
+    const inviter = await UserRepository.findById(req.user.id);
+    const { identifier, userId } = req.body;
+    const invitation = await InvitationRepository.create(Number(req.params.projectId), inviter, {
+      identifier,
+      userId,
+    });
+    res.status(201).json(invitation);
+  } catch (e) {
+    sendError(res, e, 'Ошибка отправки приглашения');
+  }
+});
+
+router.get('/:projectId/invitations', authMiddleware, checkProjectAccess('ADMIN'), async (req, res) => {
+  try {
+    res.json(await InvitationRepository.listPendingForProject(req.params.projectId));
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения приглашений');
+  }
+});
+
+/**
+ * @swagger
+ * /api/projects/{projectId}/invitations/{invitationId}:
+ *   delete:
+ *     summary: Отозвать приглашение (право ADMIN)
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *       - { in: path, name: invitationId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Приглашение отозвано }
+ *       404: { description: Приглашение не найдено или уже обработано }
+ */
+router.delete(
+  '/:projectId/invitations/:invitationId',
+  authMiddleware,
+  checkProjectAccess('ADMIN'),
+  async (req, res) => {
+    try {
+      const cancelled = await InvitationRepository.cancel(
+        Number(req.params.projectId),
+        Number(req.params.invitationId)
+      );
+      if (!cancelled) {
+        return res.status(404).json({ message: 'Приглашение не найдено или уже обработано' });
+      }
+      res.json({ message: 'Приглашение отозвано', id: cancelled.id });
+    } catch (e) {
+      sendError(res, e, 'Ошибка отзыва приглашения');
     }
   }
 );
