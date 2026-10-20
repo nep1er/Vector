@@ -20,14 +20,14 @@
   --color-success: #1f6b3a;
   --color-success-soft: rgba(31, 107, 58, 0.14);
   --color-overlay: rgba(20, 12, 4, 0.6);
-  --sidebar-bg: #3f2d19;
+  --sidebar-bg: #2a1d0f;
   --sidebar-hover: #4d3822;
   --sidebar-active: #5a4228;
   --sidebar-text: #f3e8d0;
   --sidebar-muted: #c9b690;
   --sidebar-border: #54402a;
-  --sidebar-menu: #2a1d0f;
-  --timeline-bg: #2a1d0f;
+  --sidebar-menu: #3f2d19;
+  --timeline-bg: #3f2d19;
   --timeline-grid: #46341f;
   --timeline-ruler: #c9b690;
   --timeline-today: #ff6a5a;
