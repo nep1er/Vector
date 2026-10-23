@@ -17,6 +17,12 @@ const TAGS_AGG = `
     '[]'::json
   ) AS tags`;
 
+// Роли, которым видна задача (пусто = всем) — подзапрос, чтобы не множить строки с тегами
+const VISIBLE_ROLES_SUB = `
+  (SELECT COALESCE(json_agg(json_build_object('id', r.id, 'name', r.name) ORDER BY r.name), '[]'::json)
+   FROM task_role_visibility v JOIN project_roles r ON r.id = v.project_role_id
+   WHERE v.task_id = t.id) AS visible_roles`;
+
 const fmt = (d) => new Date(d).toISOString().slice(0, 10);
 
 export class TaskRepository {
@@ -182,10 +188,10 @@ export class TaskRepository {
    * Дерево задач проекта: массив корней, у каждого узла поле children.
    * Один запрос по проекту + сборка дерева в памяти — быстрее рекурсивного SQL.
    */
-  static async getProjectTree(projectId) {
-    // Каждая задача приходит со статусом (status_id) и массивом тегов (tags)
+  static async getProjectTree(projectId, { userId = null, seeAll = true } = {}) {
+    // Каждая задача приходит со статусом (status_id), тегами (tags) и ролями видимости (visible_roles)
     const res = await pool.query(
-      `SELECT ${TASK_COLUMNS_T}, ${TAGS_AGG}
+      `SELECT ${TASK_COLUMNS_T}, ${TAGS_AGG}, ${VISIBLE_ROLES_SUB}
        FROM task t
        LEFT JOIN task_tag_applies a ON a.task_id = t.id
        LEFT JOIN task_tag tg ON tg.id = a.task_tag_id
@@ -195,8 +201,30 @@ export class TaskRepository {
       [projectId]
     );
 
+    // Не администратор не получает задачи, скрытые от его ролей (и всё вложенное в них)
+    let myRoles = null;
+    if (!seeAll) {
+      const r = await pool.query(
+        `SELECT ar.project_role_id AS id
+         FROM project_participants pp JOIN assigned_roles ar ON ar.project_participant_id = pp.id
+         WHERE pp.user_id = $1 AND pp.project_id = $2;`,
+        [userId, projectId]
+      );
+      myRoles = new Set(r.rows.map((x) => Number(x.id)));
+    }
+    const allowed = (row) =>
+      !myRoles || row.visible_roles.length === 0 || row.visible_roles.some((v) => myRoles.has(Number(v.id)));
+
+    const byId = new Map(res.rows.map((r) => [r.id, r]));
+    const visibleChain = (row) => {
+      for (let cur = row; cur; cur = cur.parent_roadmap_id != null ? byId.get(cur.parent_roadmap_id) : null) {
+        if (!allowed(cur)) return false;
+      }
+      return true;
+    };
+
     const nodes = new Map();
-    for (const row of res.rows) nodes.set(row.id, { ...row, children: [] });
+    for (const row of res.rows) if (visibleChain(row)) nodes.set(row.id, { ...row, children: [] });
 
     const roots = [];
     for (const node of nodes.values()) {
@@ -365,7 +393,7 @@ export class TaskRepository {
     if (to) conditions.push(`(t.start_date IS NULL OR t.start_date <= ${add(to)}::timestamptz)`);
 
     const res = await pool.query(
-      `SELECT ${TASK_COLUMNS_T}, ${TAGS_AGG}
+      `SELECT ${TASK_COLUMNS_T}, ${TAGS_AGG}, ${VISIBLE_ROLES_SUB}
        FROM task t
        LEFT JOIN task_tag_applies a ON a.task_id = t.id
        LEFT JOIN task_tag tg ON tg.id = a.task_tag_id

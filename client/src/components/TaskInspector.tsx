@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api } from '../api';
-import type { TaskNode, TaskTag } from '../types';
+import type { ProjectRole, TaskNode, TaskTag } from '../types';
 import { TASK_STATUSES, statusById } from '../utils/status';
 import { endIso, inputToDay, isoToInput, startIso } from '../utils/dates';
+import Dropdown from './Dropdown';
 import Icon from './Icon';
 
 interface Props {
@@ -11,13 +12,15 @@ interface Props {
   canEdit: boolean;
   /** Все теги задач проекта — из них выбираются теги задачи */
   projectTags: TaskTag[];
+  /** Роли проекта — для настройки видимости задачи */
+  projectRoles: ProjectRole[];
   onChanged: () => Promise<void> | void;
   onClose: () => void;
   onOpen: (task: TaskNode) => void;
 }
 
 /** Панель выбранной задачи: переименование, даты, удаление. */
-export default function TaskInspector({ task, canEdit, projectTags, onChanged, onClose, onOpen }: Props) {
+export default function TaskInspector({ task, canEdit, projectTags, projectRoles, onChanged, onClose, onOpen }: Props) {
   const origStart = task.start_date ? isoToInput(task.start_date) : '';
   const origEnd = task.end_date ? isoToInput(task.end_date) : '';
 
@@ -89,6 +92,25 @@ export default function TaskInspector({ task, canEdit, projectTags, onChanged, o
     }
   };
 
+  const toggleRole = async (roleId: number) => {
+    const ids = task.visible_roles.map((r) => r.id);
+    const next = ids.includes(roleId) ? ids.filter((x) => x !== roleId) : [...ids, roleId];
+    await saveVisibility(next);
+  };
+
+  const saveVisibility = async (roleIds: number[]) => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.tasks.setVisibility(task.id, roleIds);
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось изменить видимость');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const remove = async () => {
     setBusy(true);
     setError('');
@@ -133,26 +155,105 @@ export default function TaskInspector({ task, canEdit, projectTags, onChanged, o
 
       <div className="field">
         <span>Теги</span>
-        {projectTags.length === 0 ? (
-          <p className="muted hint">В проекте нет тегов. Создайте их в «Настройки → Теги задач».</p>
-        ) : (
-          <div className="tag-picker">
-            {projectTags.map((t) => {
-              const on = task.tags.some((x) => x.id === t.id);
-              return (
+        <div className="chips">
+          {task.tags.map((t) => (
+            <span key={t.id} className="fchip on-static">
+              <i className="dot" style={{ background: t.color_code }} />
+              {t.name}
+              {canEdit && (
                 <button
-                  key={t.id}
                   type="button"
-                  disabled={!canEdit || busy}
-                  className={on ? 'fchip on' : 'fchip'}
+                  className="chip-x"
+                  aria-label={`Убрать тег ${t.name}`}
+                  disabled={busy}
                   onClick={() => toggleTag(t.id)}
                 >
-                  <i className="dot" style={{ background: t.color_code }} />
-                  {t.name}
+                  ×
                 </button>
-              );
-            })}
-          </div>
+              )}
+            </span>
+          ))}
+          {canEdit && (
+            <Dropdown
+              buttonClassName="add-chip"
+              ariaLabel="Добавить тег"
+              title="Добавить тег"
+              disabled={busy}
+              button={<Icon name="plus" size={14} />}
+            >
+              <div className="pick-list">
+                {projectTags.length === 0 && (
+                  <p className="muted hint">Тегов нет. Создайте их в «Настройки → Теги задач».</p>
+                )}
+                {projectTags.map((t) => {
+                  const on = task.tags.some((x) => x.id === t.id);
+                  return (
+                    <button key={t.id} type="button" className="pick-item" onClick={() => toggleTag(t.id)}>
+                      <i className="dot" style={{ background: t.color_code }} />
+                      <span>{t.name}</span>
+                      {on && <Icon name="check" size={16} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </Dropdown>
+          )}
+          {!canEdit && task.tags.length === 0 && <span className="muted">—</span>}
+        </div>
+      </div>
+
+      <div className="field">
+        <span>Видимость</span>
+        <div className="chips">
+          {task.visible_roles.length === 0 ? (
+            <span className="fchip on-static">Все</span>
+          ) : (
+            task.visible_roles.map((r) => (
+              <span key={r.id} className="fchip on-static">
+                {r.name}
+                {canEdit && (
+                  <button
+                    type="button"
+                    className="chip-x"
+                    aria-label={`Убрать роль ${r.name}`}
+                    disabled={busy}
+                    onClick={() => toggleRole(r.id)}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))
+          )}
+          {canEdit && (
+            <Dropdown
+              buttonClassName="add-chip"
+              ariaLabel="Выбрать, кто видит задачу"
+              title="Кто видит задачу"
+              disabled={busy}
+              button={<Icon name="plus" size={14} />}
+            >
+              <div className="pick-list">
+                <button type="button" className="pick-item" onClick={() => saveVisibility([])}>
+                  <span>Все</span>
+                  {task.visible_roles.length === 0 && <Icon name="check" size={16} />}
+                </button>
+                <div className="pick-sep">Только роли</div>
+                {projectRoles.map((r) => {
+                  const on = task.visible_roles.some((x) => x.id === r.id);
+                  return (
+                    <button key={r.id} type="button" className="pick-item" onClick={() => toggleRole(r.id)}>
+                      <span>{r.name}</span>
+                      {on && <Icon name="check" size={16} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </Dropdown>
+          )}
+        </div>
+        {task.visible_roles.length > 0 && (
+          <span className="muted hint">Администраторы проекта видят задачу всегда.</span>
         )}
       </div>
 

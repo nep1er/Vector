@@ -1,6 +1,7 @@
 import { pool } from '../config/db.js';
 import { RoleRepository } from '../db/RoleRepository.js';
 import { TaskRepository } from '../db/TaskRepository.js';
+import { TaskVisibilityRepository } from '../db/TaskVisibilityRepository.js';
 import { sendError } from '../utils/httpError.js';
 
 /**
@@ -47,7 +48,20 @@ export const checkTaskAccess = (requiredPermission) => async (req, res, next) =>
     }
     const task = await TaskRepository.findById(taskId);
     if (!task) return res.status(404).json({ message: 'Задача не найдена' });
-    return authorize(req, res, next, task.project_id, requiredPermission);
+    // Задача, скрытая от ролей пользователя, для него «не существует» (кроме ADMIN проекта)
+    const afterAuth = async () => {
+      try {
+        if (!req.userPermissions.includes('ADMIN') &&
+            !(await TaskVisibilityRepository.canSee(taskId, req.user.id))) {
+          return res.status(404).json({ message: 'Задача не найдена' });
+        }
+        next();
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Ошибка проверки прав доступа' });
+      }
+    };
+    return authorize(req, res, afterAuth, task.project_id, requiredPermission);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Ошибка проверки прав доступа' });

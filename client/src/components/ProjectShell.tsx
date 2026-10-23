@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import type { Participant } from '../types';
 import Avatar from './Avatar';
 import Icon from './Icon';
+import Dropdown from './Dropdown';
 import Logo from './Logo';
+import ThemeSwitcher from './ThemeSwitcher';
 
 export interface Crumb {
   label: string;
@@ -16,6 +18,8 @@ interface Props {
   canInvite: boolean;
   canAddTask: boolean;
   canSettings: boolean;
+  /** Кнопка «Фильтры» с выпадающим меню */
+  filterSlot: ReactNode;
   onParticipants: () => void;
   onAddMember: () => void;
   onAddTask: () => void;
@@ -65,11 +69,24 @@ export default function ProjectShell(p: Props) {
         </div>
 
         <div className="rail-section rail-bottom">
+          {p.filterSlot}
           {p.canAddTask && (
             <button className="rail-btn" title="Добавить задачу" aria-label="Добавить задачу" onClick={p.onAddTask}>
               <Icon name="plus" />
             </button>
           )}
+          <Dropdown
+            placement="right"
+            buttonClassName="rail-btn"
+            ariaLabel="Тема оформления"
+            title="Тема"
+            button={<Icon name="theme" />}
+          >
+            <div className="theme-panel">
+              <strong>Тема оформления</strong>
+              <ThemeSwitcher />
+            </div>
+          </Dropdown>
           {p.canSettings && (
             <button className="rail-btn" title="Настройки" aria-label="Настройки" onClick={p.onSettings}>
               <Icon name="settings" />

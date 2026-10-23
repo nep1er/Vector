@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import Avatar from './Avatar';
 import Icon from './Icon';
+import ThemeSwitcher from './ThemeSwitcher';
 
 /** Блок профиля внизу меню: по клику раскрывается список действий. */
 export default function UserMenu() {
@@ -42,6 +43,13 @@ export default function UserMenu() {
             <Icon name="user" />
             Настройки профиля
           </button>
+          <div className="menu-theme">
+            <span>
+              <Icon name="theme" size={18} />
+              Тема
+            </span>
+            <ThemeSwitcher />
+          </div>
           <button className="menu-item" role="menuitem" disabled>
             <Icon name="globe" />
             Язык

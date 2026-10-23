@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { RoadmapRepository } from '../db/RoadmapRepository.js';
 import { TodoRepository } from '../db/TodoRepository.js';
+import { TaskVisibilityRepository } from '../db/TaskVisibilityRepository.js';
 import { TaskRepository } from '../db/TaskRepository.js';
 import { UserRepository } from '../db/UserRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
@@ -143,7 +144,10 @@ router.post('/projects/:projectId/todo', authMiddleware, checkProjectAccess('WRI
  */
 router.get('/projects/:projectId/tree', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
   try {
-    const tree = await TaskRepository.getProjectTree(req.params.projectId);
+    const tree = await TaskRepository.getProjectTree(req.params.projectId, {
+      userId: req.user.id,
+      seeAll: req.userPermissions.includes('ADMIN'),
+    });
     res.json(tree);
   } catch (error) {
     sendError(res, error, 'Ошибка получения дерева задач');
@@ -390,16 +394,75 @@ router.get('/projects/:projectId/search', authMiddleware, checkProjectAccess('RE
     if ([...tagIds, ...statusIds].some((n) => !Number.isInteger(n))) {
       return res.status(400).json({ message: 'tagIds и statusIds — целые числа через запятую' });
     }
-    const tasks = await TaskRepository.searchTasks(req.params.projectId, {
+    let tasks = await TaskRepository.searchTasks(req.params.projectId, {
       tagIds,
       tagMode: req.query.tagMode === 'all' ? 'all' : 'any',
       statusIds,
       from: req.query.from,
       to: req.query.to,
     });
+    if (!req.userPermissions.includes('ADMIN')) {
+      // оставляем только задачи, видимые роли пользователя (с учётом скрытых родителей)
+      const tree = await TaskRepository.getProjectTree(req.params.projectId, {
+        userId: req.user.id,
+        seeAll: false,
+      });
+      const ids = new Set();
+      const walk = (nodes) => nodes.forEach((n) => (ids.add(n.id), walk(n.children)));
+      walk(tree);
+      tasks = tasks.filter((t) => ids.has(t.id));
+    }
     res.json(tasks);
   } catch (e) {
     sendError(res, e, 'Ошибка поиска задач');
+  }
+});
+
+/**
+ * @swagger
+ * /api/tasks/{taskId}/visibility:
+ *   get:
+ *     summary: Роли, которым видна задача (пустой массив = все участники проекта)
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: taskId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "Массив {id, name}" }
+ *   put:
+ *     summary: Задать роли, которым видна задача (право EXECUTE). Пустой roleIds = видна всем
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: taskId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleIds]
+ *             properties:
+ *               roleIds: { type: array, items: { type: integer }, example: [2, 3] }
+ *     responses:
+ *       200: { description: Итоговый список ролей }
+ *       400: { description: Роль не найдена или из другого проекта }
+ */
+router.get('/:taskId/visibility', authMiddleware, checkTaskAccess('READ'), async (req, res) => {
+  try {
+    res.json(await TaskVisibilityRepository.getRoles(req.params.taskId));
+  } catch (error) {
+    sendError(res, error, 'Ошибка получения видимости задачи');
+  }
+});
+
+router.put('/:taskId/visibility', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
+  try {
+    res.json(await TaskVisibilityRepository.setRoles(req.params.taskId, req.body.roleIds));
+  } catch (error) {
+    sendError(res, error, 'Ошибка изменения видимости задачи');
   }
 });
 

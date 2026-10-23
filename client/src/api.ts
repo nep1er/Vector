@@ -208,6 +208,14 @@ const tasks = {
   updateDates: (taskId: number, startDate?: string, endDate?: string) =>
     request<Task>('PATCH', `/api/tasks/${taskId}/dates`, { startDate, endDate }),
 
+  /** Роли, которым видна задача (пусто = все) */
+  visibility: (taskId: number) =>
+    request<{ id: number; name: string }[]>('GET', `/api/tasks/${taskId}/visibility`),
+
+  /** Задать видимость: roleIds = [] означает «Все» (право EXECUTE) */
+  setVisibility: (taskId: number, roleIds: number[]) =>
+    request<{ id: number; name: string }[]>('PUT', `/api/tasks/${taskId}/visibility`, { roleIds }),
+
   /** Справочник статусов (Выполнено, В процессе, ...) */
   statuses: () => request<TaskStatus[]>('GET', '/api/tasks/statuses'),
 

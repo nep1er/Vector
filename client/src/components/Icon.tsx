@@ -29,7 +29,10 @@ export type IconName =
   | 'minus'
   | 'roadmap'
   | 'users'
-  | 'user-plus';
+  | 'user-plus'
+  | 'filter'
+  | 'theme'
+  | 'chevron-down';
 
 export default function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return (

@@ -165,7 +165,7 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
 
           <div
             className="tracks"
-            style={{ height: laneCount * (LANE_H + LANE_GAP) + LANE_GAP }}
+            style={{ minHeight: laneCount * (LANE_H + LANE_GAP) + LANE_GAP }}
           >
             {ticks.map((d) => (
               <div key={d} className="grid-line" style={{ left: dayLeft(d) }} />

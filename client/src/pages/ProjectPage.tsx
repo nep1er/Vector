@@ -10,8 +10,8 @@ import ProjectShell from '../components/ProjectShell';
 import RoadmapFilters from '../components/RoadmapFilters';
 import TaskInspector from '../components/TaskInspector';
 import Timeline from '../components/Timeline';
-import type { Participant, ProjectDetails, TaskNode, TaskTag } from '../types';
-import { EMPTY_FILTERS, filtersActive, matchesFilters } from '../utils/status';
+import type { Participant, ProjectDetails, ProjectRole, TaskNode, TaskTag } from '../types';
+import { EMPTY_FILTERS, matchesFilters } from '../utils/status';
 import type { TaskFilters } from '../utils/status';
 
 /** Путь от корня дерева до узла с нужным id */
@@ -40,20 +40,23 @@ export default function ProjectPage() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [projectTags, setProjectTags] = useState<TaskTag[]>([]);
+  const [projectRoles, setProjectRoles] = useState<ProjectRole[]>([]);
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
 
   const load = useCallback(async () => {
     try {
-      const [p, t, members, tags] = await Promise.all([
+      const [p, t, members, tags, roles] = await Promise.all([
         api.projects.get(pid),
         api.tasks.tree(pid),
         api.projects.participants(pid),
         api.taskTags.listByProject(pid),
+        api.roles.listByProject(pid),
       ]);
       setProject(p);
       setTree(t);
       setParticipants(members);
       setProjectTags(tags);
+      setProjectRoles(roles);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить проект');
@@ -136,18 +139,8 @@ export default function ProjectPage() {
       onAddMember={() => setShowAddMember(true)}
       onAddTask={() => setShowCreate(true)}
       onSettings={() => setSettingsTab('general')}
+      filterSlot={<RoadmapFilters tags={projectTags} value={filters} onChange={setFilters} />}
     >
-      <div className="page-head">
-        <h1>{isRoot ? project.title : current.title}</h1>
-      </div>
-
-      <RoadmapFilters tags={projectTags} value={filters} onChange={setFilters} />
-      {filtersActive(filters) && (
-        <p className="muted hint">
-          Показано задач: {visible.length} из {current.children.length}
-        </p>
-      )}
-
       <div className={selected ? 'roadmap-layout has-inspector' : 'roadmap-layout'}>
         <Timeline
           key={current.id}
@@ -162,6 +155,7 @@ export default function ProjectPage() {
             task={selected}
             canEdit={can('EXECUTE')}
             projectTags={projectTags}
+            projectRoles={projectRoles}
             onChanged={load}
             onClose={() => setSelectedId(null)}
             onOpen={openRoadmap}

@@ -43,6 +43,8 @@ export interface Task {
   status_id: number;
   /** Теги задач (task_tag) */
   tags: TaskTag[];
+  /** Роли, которым видна задача; пустой массив = видна всем */
+  visible_roles: { id: number; name: string }[];
 }
 
 /** Узел дерева задач: /api/tasks/projects/:id/tree возвращает массив корней */
