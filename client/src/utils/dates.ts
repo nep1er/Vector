@@ -33,3 +33,9 @@ export const nextMonthStart = (idx: number) => {
   const d = new Date(idx * DAY);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) / DAY;
 };
+
+/** «29.10» — день и месяц для подписей шкалы в крупном масштабе */
+export const dayMonth = (idx: number) => {
+  const d = new Date(idx * DAY);
+  return `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};

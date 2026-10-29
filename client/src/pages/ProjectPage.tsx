@@ -145,6 +145,7 @@ export default function ProjectPage() {
       onAddTask={() => setShowCreate(true)}
       onSettings={() => setSettingsTab('general')}
       onShift={() => setShowShift(true)}
+      onDashboard={can('EXECUTE') ? () => navigate(`/projects/${pid}/dashboard`) : undefined}
       filterSlot={<RoadmapFilters tags={projectTags} value={filters} onChange={setFilters} />}
     >
       <div className={selected ? 'roadmap-layout has-inspector' : 'roadmap-layout'}>

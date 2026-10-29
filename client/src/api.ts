@@ -9,6 +9,8 @@ import type {
   AuthResponse,
   CardComment,
   CardFile,
+  DashboardData,
+  FriendRow,
   MyTasksProject,
   ShiftItem,
   ShiftPlan,
@@ -450,6 +452,8 @@ const invitations = {
 };
 
 const friends = {
+  list: () => request<FriendRow[]>('GET', '/api/friends'),
+  sendRequest: (identifier: string) => request<unknown>('POST', '/api/friends/requests', { identifier }),
   accept: (friendId: number) => request<unknown>('POST', `/api/friends/${friendId}/accept`),
   remove: (friendId: number) => request<unknown>('DELETE', `/api/friends/${friendId}`),
 };
@@ -486,6 +490,10 @@ const storage = {
   download: (fileId: number, name: string) => download(`/api/storage/files/${fileId}/download`, name),
 };
 
+const dashboard = {
+  get: (projectId: number) => request<DashboardData>('GET', `/api/dashboard/projects/${projectId}`),
+};
+
 const shifts = {
   preview: (projectId: number, body: { roadmapId: number; fromDate: string; days: number }) =>
     request<ShiftPlan>('POST', `/api/task-shifts/projects/${projectId}/preview`, body),
@@ -515,4 +523,5 @@ export const api = {
   storage,
   myTasks,
   shifts,
+  dashboard,
 };

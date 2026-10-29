@@ -24,6 +24,8 @@ interface Props {
   filterSlot?: ReactNode;
   /** Кнопка «Смещение сроков» (волшебная кнопка RoadMap) */
   onShift?: () => void;
+  /** Кнопка «Дашборд» (только руководителям) */
+  onDashboard?: () => void;
   /** Подпись кнопки «+» (по умолчанию «Добавить задачу») */
   addLabel?: string;
   onParticipants: () => void;
@@ -76,6 +78,11 @@ export default function ProjectShell(p: Props) {
 
         <div className="rail-section rail-bottom">
           {p.filterSlot}
+          {p.onDashboard && (
+            <button className="rail-btn" title="Дашборд" aria-label="Дашборд" onClick={p.onDashboard}>
+              <Icon name="dashboard" />
+            </button>
+          )}
           {p.onShift && (
             <button className="rail-btn" title="Смещение сроков" aria-label="Смещение сроков" onClick={p.onShift}>
               <Icon name="shift" />

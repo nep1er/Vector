@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TaskNode } from '../types';
-import { dayIndex, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
+import { dayIndex, dayMonth, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
 import { statusById, textOn } from '../utils/status';
 import Icon from './Icon';
 
 const ZOOMS = [4, 7, 12, 20, 32, 48, 72]; // пикселей на день
+const DEFAULT_ZOOM = ZOOMS[ZOOMS.length - 2]; // по умолчанию — предпоследнее приближение: виден каждый день
 const LANE_H = 56;
 const LANE_GAP = 8;
 
@@ -52,8 +53,7 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
   }, [range.start, range.end, dated, today]);
 
   const span = endDay - startDay + 1;
-  const fit = [...ZOOMS].reverse().find((z) => span * z <= 980) ?? ZOOMS[0];
-  const ppd = zoom ?? fit;
+  const ppd = zoom ?? DEFAULT_ZOOM;
   const zoomIdx = ZOOMS.indexOf(ppd);
 
   // Раскладка по дорожкам
@@ -157,7 +157,7 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
             <div className="ruler-days">
               {ticks.map((d) => (
                 <div key={d} className="ruler-tick" style={{ left: dayLeft(d) }}>
-                  {dayOfMonth(d)}
+                  {ppd >= 40 ? dayMonth(d) : dayOfMonth(d)}
                 </div>
               ))}
             </div>

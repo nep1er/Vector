@@ -36,10 +36,19 @@ export default function ProjectsPage() {
     navigate(`/projects/${project.id}`);
   };
 
+  const [q, setQ] = useState('');
+  const shown = projects.filter((p) => `${p.title} ${p.description ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()));
+
   return (
-    <>
+    <div className="wide-page">
       <div className="page-head">
-        <h1>Проекты</h1>
+        <div>
+          <h1>Проекты</h1>
+          {!loading && projects.length > 0 && <p className="muted">Всего проектов: {projects.length}</p>}
+        </div>
+        {projects.length > 0 && (
+          <input className="home-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Найти проект" aria-label="Найти проект" />
+        )}
         <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
           <Icon name="plus" size={18} />
           Создать проект
@@ -69,18 +78,25 @@ export default function ProjectsPage() {
             <h2>Проектов пока нет</h2>
           </div>
         ) : (
-          <ul className="tiles">
-            {projects.map((p) => (
+          <ul className="tiles tiles-big">
+            {shown.map((p) => (
               <li key={p.id}>
-                <Link to={`/projects/${p.id}`} className="tile" title={p.description ?? undefined}>
+                <Link to={`/projects/${p.id}`} className="tile tile-big" title={p.description ?? undefined}>
                   <div
                     className="tile-cover"
                     style={{ background: `var(--gradient-project-${(p.id % GRADIENTS) + 1})` }}
-                  />
-                  <div className="tile-title">{p.title}</div>
+                  >
+                    <span className="tile-letter">{p.title.trim().charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="tile-body">
+                    <div className="tile-title">{p.title}</div>
+                    <p className="tile-desc">{p.description || 'Без описания'}</p>
+                    <span className="muted tile-date">Создан {new Date(p.created_at).toLocaleDateString('ru-RU')}</span>
+                  </div>
                 </Link>
               </li>
             ))}
+            {shown.length === 0 && <li className="muted">Ничего не найдено.</li>}
           </ul>
         ))
       )}
@@ -88,6 +104,6 @@ export default function ProjectsPage() {
       {showCreate && (
         <CreateProjectModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />
       )}
-    </>
+    </div>
   );
 }

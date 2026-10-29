@@ -5,6 +5,8 @@ import AuthPage from './pages/AuthPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProfilePage from './pages/ProfilePage';
 import TasksPage from './pages/TasksPage';
+import FriendsPage from './pages/FriendsPage';
+import DashboardPage from './pages/DashboardPage';
 import NotificationsPage from './pages/NotificationsPage';
 import TodoPage from './pages/TodoPage';
 import ProjectPage from './pages/ProjectPage';
@@ -36,10 +38,12 @@ export default function App() {
         <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="projects/:projectId/roadmap/:roadmapId" element={<ProjectPage />} />
         <Route path="projects/:projectId/todo/:todoId" element={<TodoPage />} />
+        <Route path="projects/:projectId/dashboard" element={<DashboardPage />} />
 
         <Route element={<Layout />}>
           <Route index element={<ProjectsPage />} />
           <Route path="tasks" element={<TasksPage />} />
+          <Route path="friends" element={<FriendsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>

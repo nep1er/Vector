@@ -275,3 +275,38 @@ export interface ShiftRecord {
   reverted_at: string | null;
   reverted_by_name: string | null;
 }
+
+// ---- Друзья ----
+export interface FriendRow {
+  id: number;
+  status: 'PENDING' | 'ACCEPTED';
+  direction: 'INCOMING' | 'OUTGOING';
+  created_at: string;
+  accepted_at: string | null;
+  user_id: number;
+  username: string;
+  email: string;
+  avatar_url: string | null;
+}
+
+// ---- Дашборд руководителя ----
+export interface DashTask {
+  id: number;
+  title: string;
+  type: 'ROADMAP' | 'TODO';
+  status_id: number;
+  end_date: string | null;
+  parent_roadmap_id: number | null;
+  days_late?: number;
+}
+export interface DashboardData {
+  generated_at: string;
+  tasks: { total: number; roadmaps: number; todos: number; done: number; overdue: number; no_dates: number; by_status: Record<string, number> };
+  overdue_list: DashTask[];
+  soon_list: DashTask[];
+  weeks: { start: string; done: number; open: number }[];
+  cards: { total: number; done: number; overdue: number; unassigned: number };
+  people: { id: number; user_id: number; username: string; avatar_url: string | null; assigned: number; done: number; overdue: number }[];
+  todo_progress: (DashTask & { cards_total: number; cards_done: number })[];
+  shifts: { count: number; days: number; tasks: number; last_at: string | null };
+}
