@@ -102,8 +102,34 @@ export interface CardComment {
 export interface CardFile {
   id: number;
   kanban_card_id: number;
-  file_path: string;
   uploaded_at: string;
+  /** upload — файл на сервере, link — ссылка, path — устаревший путь */
+  kind: 'upload' | 'link' | 'path';
+  name: string;
+  url: string | null;
+  size: number | null;
+}
+
+/** Запись раздела хранилища: загруженный файл (FILE) или ссылка (LINK) */
+export interface StorageFile {
+  id: number;
+  name: string;
+  resource_type: 'FILE' | 'LINK';
+  /** только у LINK — адрес; у FILE путь на диске наружу не отдаётся */
+  resource_path?: string;
+  size?: number | null;
+  uploaded_by: number | null;
+  uploader_name?: string | null;
+  created_at: string;
+}
+
+export interface StorageFolder {
+  id: number;
+  project_id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+  files: StorageFile[];
 }
 
 export interface ProjectRole {

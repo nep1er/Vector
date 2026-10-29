@@ -9,6 +9,8 @@ import type {
   AuthResponse,
   CardComment,
   CardFile,
+  StorageFile,
+  StorageFolder,
   KanbanColumn,
   Project,
   ProjectDetails,
@@ -65,10 +67,15 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+async function request<T>(
+  method: Method,
+  path: string,
+  body?: unknown,
+  extraHeaders: Record<string, string> = {},
+): Promise<T> {
+  const headers: Record<string, string> = { ...extraHeaders };
   const isBlob = body instanceof Blob; // файл отправляем как есть, остальное — как JSON
-  if (isBlob) headers['Content-Type'] = (body as Blob).type;
+  if (isBlob) headers['Content-Type'] = (body as Blob).type || 'application/octet-stream';
   else if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const token = tokenStorage.get();
@@ -100,6 +107,37 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
     throw new ApiError(res.status, data?.message ?? `Ошибка сервера (${res.status})`);
   }
   return data as T;
+}
+
+/** Заголовок с именем файла для загрузки (кириллица кодируется) */
+const uploadHeaders = (file: File) => ({ 'X-File-Name': encodeURIComponent(file.name) });
+
+/** Скачивание с авторизацией: тянем файл как blob и отдаём браузеру */
+async function download(path: string, fileName: string): Promise<void> {
+  const token = tokenStorage.get();
+  let res: Response;
+  try {
+    res = await fetch(BASE_URL + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ApiError(0, 'Не удалось связаться с сервером. Проверьте, что он запущен.');
+  }
+  if (!res.ok) {
+    let message = `Ошибка сервера (${res.status})`;
+    try {
+      message = (await res.json()).message ?? message;
+    } catch {
+      /* не JSON */
+    }
+    throw new ApiError(res.status, message);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,8 +320,15 @@ const kanban = {
 
   cardFiles: (cardId: number) => request<CardFile[]>('GET', `/api/kanban/cards/${cardId}/files`),
 
-  addCardFile: (cardId: number, filePath: string) =>
-    request<CardFile>('POST', `/api/kanban/cards/${cardId}/files`, { filePath }),
+  /** Загрузка файла на сервер и прикрепление к карточке */
+  uploadCardFile: (cardId: number, file: File) =>
+    request<CardFile>('POST', `/api/kanban/cards/${cardId}/files/upload`, file, uploadHeaders(file)),
+
+  /** Внешняя ссылка (GitHub, Figma…) */
+  addCardLink: (cardId: number, url: string) =>
+    request<CardFile>('POST', `/api/kanban/cards/${cardId}/files`, { url }),
+
+  downloadCardFile: (fileId: number, name: string) => download(`/api/kanban/files/${fileId}/download`, name),
 
   deleteFile: (fileId: number) => request<{ message: string }>('DELETE', `/api/kanban/files/${fileId}`),
 
@@ -405,6 +450,34 @@ const friends = {
   remove: (friendId: number) => request<unknown>('DELETE', `/api/friends/${friendId}`),
 };
 
+// ---------------------------------------------------------------------------
+// STORAGE  /api/storage   (хранилища проекта: файлы на сервере и ссылки)
+// ---------------------------------------------------------------------------
+const storage = {
+  list: (projectId: number) => request<StorageFolder[]>('GET', `/api/storage/project/${projectId}`),
+
+  createFolder: (projectId: number, name: string, description?: string) =>
+    request<StorageFolder>('POST', `/api/storage/project/${projectId}`, { name, description }),
+
+  updateFolder: (storageId: number, data: { name?: string; description?: string }) =>
+    request<StorageFolder>('PATCH', `/api/storage/${storageId}`, data),
+
+  deleteFolder: (storageId: number) => request<unknown>('DELETE', `/api/storage/${storageId}`),
+
+  uploadFile: (storageId: number, file: File) =>
+    request<StorageFile>('POST', `/api/storage/${storageId}/upload`, file, uploadHeaders(file)),
+
+  addLink: (storageId: number, name: string, url: string) =>
+    request<StorageFile>('POST', `/api/storage/${storageId}/files`, { resourceType: 'LINK', name, resourcePath: url }),
+
+  updateFile: (fileId: number, data: { name?: string; resourcePath?: string }) =>
+    request<StorageFile>('PATCH', `/api/storage/files/${fileId}`, data),
+
+  deleteFile: (fileId: number) => request<unknown>('DELETE', `/api/storage/files/${fileId}`),
+
+  download: (fileId: number, name: string) => download(`/api/storage/files/${fileId}/download`, name),
+};
+
 export const api = {
   auth,
   projects,
@@ -416,4 +489,5 @@ export const api = {
   notifications,
   invitations,
   friends,
+  storage,
 };

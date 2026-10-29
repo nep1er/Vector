@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { fileSize, removeFile } from '../utils/fileStore.js';
 
 const RESOURCE_TYPES = ['FILE', 'LINK'];
 
@@ -37,18 +38,45 @@ export class StorageRepository {
                   'resource_type', sf.resource_type,
                   'resource_path', sf.resource_path,
                   'uploaded_by', sf.uploaded_by,
+                  'uploader_name', u.username,
                   'created_at', sf.created_at
                 ) ORDER BY sf.created_at, sf.id) FILTER (WHERE sf.id IS NOT NULL),
                 '[]'::json
               ) AS files
        FROM project_storage ps
        LEFT JOIN storage_files sf ON sf.project_storage_id = ps.id
+       LEFT JOIN users u ON u.id = sf.uploaded_by
        WHERE ps.project_id = $1
        GROUP BY ps.id
        ORDER BY ps.name;`,
       [projectId]
     );
+    // Для загруженных файлов добавляем размер, ключ на диске наружу не отдаём
+    for (const folder of res.rows) {
+      folder.files = await Promise.all(
+        folder.files.map(async ({ resource_path, ...f }) =>
+          f.resource_type === 'FILE'
+            ? { ...f, size: await fileSize(resource_path) }
+            : { ...f, resource_path }
+        )
+      );
+    }
     return res.rows;
+  }
+
+  static async findFile(fileId) {
+    const res = await pool.query('SELECT * FROM storage_files WHERE id = $1;', [fileId]);
+    return res.rows[0];
+  }
+
+  /** Сохраняет уже записанный на диск файл как запись типа FILE */
+  static async addUploadedFile(storageId, name, key, userId) {
+    const res = await pool.query(
+      `INSERT INTO storage_files (project_storage_id, resource_type, name, resource_path, uploaded_by)
+       VALUES ($1, 'FILE', $2, $3, $4) RETURNING id, project_storage_id, resource_type, name, uploaded_by, created_at;`,
+      [storageId, cleanText(name, 'Название', 255), key, userId]
+    );
+    return res.rows[0];
   }
 
   static async createFolder(projectId, name, description) {
@@ -77,11 +105,20 @@ export class StorageRepository {
 
   /** Удаляет раздел вместе с файлами и ссылками внутри (ON DELETE CASCADE) */
   static async deleteFolder(storageId) {
+    const files = await pool.query(
+      `SELECT resource_path FROM storage_files WHERE project_storage_id = $1 AND resource_type = 'FILE';`,
+      [storageId]
+    );
     const res = await pool.query('DELETE FROM project_storage WHERE id = $1 RETURNING id;', [storageId]);
+    if (res.rows[0]) for (const f of files.rows) await removeFile(f.resource_path);
     return res.rows[0];
   }
 
+  /** Только внешние ссылки; файлы загружаются через addUploadedFile */
   static async addFile(storageId, { resourceType, name, resourcePath }, userId) {
+    if (resourceType !== 'LINK') {
+      throw new Error('400: Файл нужно загрузить (POST /api/storage/:storageId/upload); здесь можно добавить только ссылку (LINK)');
+    }
     const path = cleanResource(resourceType, resourcePath);
     const res = await pool.query(
       `INSERT INTO storage_files (project_storage_id, resource_type, name, resource_path, uploaded_by)
@@ -94,6 +131,9 @@ export class StorageRepository {
   static async updateFile(fileId, { name, resourcePath }) {
     const current = await pool.query('SELECT resource_type FROM storage_files WHERE id = $1;', [fileId]);
     if (current.rows.length === 0) return undefined;
+    if (resourcePath !== undefined && current.rows[0].resource_type !== 'LINK') {
+      throw new Error('400: Путь можно менять только у ссылки; у загруженного файла — только название');
+    }
     const path =
       resourcePath === undefined ? null : cleanResource(current.rows[0].resource_type, resourcePath);
 
@@ -104,11 +144,15 @@ export class StorageRepository {
        WHERE id = $3 RETURNING *;`,
       [name === undefined ? null : cleanText(name, 'Название', 255), path, fileId]
     );
-    return res.rows[0];
+    const row = res.rows[0];
+    if (row?.resource_type === 'FILE') delete row.resource_path; // ключ на диске наружу не отдаём
+    return row;
   }
 
   static async deleteFile(fileId) {
-    const res = await pool.query('DELETE FROM storage_files WHERE id = $1 RETURNING id;', [fileId]);
-    return res.rows[0];
+    const res = await pool.query('DELETE FROM storage_files WHERE id = $1 RETURNING id, resource_type, resource_path;', [fileId]);
+    const row = res.rows[0];
+    if (row?.resource_type === 'FILE') await removeFile(row.resource_path);
+    return row && { id: row.id };
   }
 }

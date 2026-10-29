@@ -7,6 +7,7 @@ import Avatar from './Avatar';
 import Dropdown from './Dropdown';
 import Icon from './Icon';
 import Modal from './Modal';
+import { MAX_UPLOAD_MB, formatSize, tooBig } from '../utils/format';
 
 interface Props {
   card: KanbanCard;
@@ -263,16 +264,23 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
         {files.map((f) => (
           <li key={f.id} className="list-row">
             <div className="list-main">
-              {/^https?:\/\//i.test(f.file_path) ? (
-                <a href={f.file_path} target="_blank" rel="noreferrer noopener">
-                  {f.file_path}
+              {f.kind === 'link' ? (
+                <a href={f.url ?? '#'} target="_blank" rel="noreferrer noopener">
+                  {f.name}
                 </a>
+              ) : f.kind === 'upload' ? (
+                <button type="button" className="link-btn" onClick={() => run(() => api.kanban.downloadCardFile(f.id, f.name))}>
+                  {f.name}
+                </button>
               ) : (
-                <span>{f.file_path}</span>
+                <span>{f.name}</span>
               )}
+              <span className="muted">
+                {f.kind === 'upload' ? formatSize(f.size) : f.kind === 'link' ? 'ссылка' : ''}
+              </span>
             </div>
             {canEdit && (
-              <button className="icon-btn" aria-label="Удалить вложение" disabled={busy} onClick={() => run(() => api.kanban.deleteFile(f.id), true)}>
+              <button className="icon-btn" aria-label={`Удалить вложение ${f.name}`} disabled={busy} onClick={() => run(() => api.kanban.deleteFile(f.id), true)}>
                 <Icon name="trash" size={16} />
               </button>
             )}
@@ -281,23 +289,44 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
         {files.length === 0 && <li className="muted">Нет вложений</li>}
       </ul>
       {canEdit && (
-        <form
-          className="inline-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const v = newFile.trim();
-            if (!v) return;
-            run(async () => {
-              await api.kanban.addCardFile(card.id, v);
-              setNewFile('');
-            }, true);
-          }}
-        >
-          <input value={newFile} maxLength={512} placeholder="Ссылка или путь к файлу" onChange={(e) => setNewFile(e.target.value)} />
-          <button className="btn btn-secondary" disabled={busy || !newFile.trim()}>
-            Прикрепить
-          </button>
-        </form>
+        <div className="attach-bar">
+          <label className="btn btn-secondary attach-pick">
+            Прикрепить файлы
+            <input
+              type="file"
+              multiple
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                const picked = [...(e.target.files ?? [])];
+                e.target.value = '';
+                if (picked.length === 0) return;
+                const big = picked.find(tooBig);
+                if (big) return setError(`Файл «${big.name}» больше ${MAX_UPLOAD_MB} МБ`);
+                run(async () => {
+                  for (const file of picked) await api.kanban.uploadCardFile(card.id, file);
+                }, true);
+              }}
+            />
+          </label>
+          <form
+            className="inline-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const v = newFile.trim();
+              if (!v) return;
+              run(async () => {
+                await api.kanban.addCardLink(card.id, v);
+                setNewFile('');
+              }, true);
+            }}
+          >
+            <input value={newFile} maxLength={512} placeholder="…или ссылка (https://…)" onChange={(e) => setNewFile(e.target.value)} />
+            <button className="btn btn-secondary" disabled={busy || !newFile.trim()}>
+              Добавить
+            </button>
+          </form>
+        </div>
       )}
 
       <h3 className="section-title">Комментарии ({comments.length})</h3>

@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { KanbanRepository } from '../db/KanbanRepository.js';
 import { CommentRepository } from '../db/CommentRepository.js';
 import { FileRepository } from '../db/FileRepository.js';
+import { MAX_UPLOAD_MB, readUploadName, removeFile, requireBody, resolveKey, saveFile } from '../utils/fileStore.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import {
   checkCardAccess,
@@ -391,7 +392,7 @@ router.delete(
  *     responses:
  *       200: { description: Список файлов }
  *   post:
- *     summary: Прикрепить файл (путь или ссылку) к карточке. Право WRITE
+ *     summary: Прикрепить внешнюю ссылку к карточке (файлы — через /files/upload). Право WRITE
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -402,11 +403,35 @@ router.delete(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [filePath]
+ *             required: [url]
  *             properties:
- *               filePath: { type: string }
+ *               url: { type: string, example: "https://figma.com/file/..." }
  *     responses:
  *       201: { description: Файл добавлен }
+ * /api/kanban/cards/{cardId}/files/upload:
+ *   post:
+ *     summary: "Загрузить файл на сервер и прикрепить к карточке (WRITE). Тело — сам файл до 25 МБ, имя — в заголовке X-File-Name (URL-encoded)"
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *       - { in: header, name: X-File-Name, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/octet-stream:
+ *           schema: { type: string, format: binary }
+ *     responses:
+ *       201: { description: Файл сохранён }
+ * /api/kanban/files/{fileId}/download:
+ *   get:
+ *     summary: Скачать вложение (READ)
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: fileId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Содержимое файла }
  * /api/kanban/files/{fileId}:
  *   delete:
  *     summary: Удалить файл карточки. Право WRITE
@@ -426,33 +451,74 @@ router.get(
   })
 );
 
+const rawFile = express.raw({ type: () => true, limit: `${MAX_UPLOAD_MB}mb` });
+
 router.post(
   '/cards/:cardId/files',
   authMiddleware,
   checkCardAccess('WRITE'),
-  wrap('Ошибка добавления файла', async (req, res) => {
-    const path = String(req.body?.filePath ?? '').trim();
-    if (!path) return res.status(400).json({ message: 'Укажите путь или ссылку на файл' });
-    if (path.length > 512) return res.status(400).json({ message: 'Путь — не длиннее 512 символов' });
-    res.status(201).json(await FileRepository.addFileToCard(req.params.cardId, path));
+  wrap('Ошибка добавления ссылки', async (req, res) => {
+    const url = String(req.body?.url ?? req.body?.filePath ?? '').trim();
+    if (!url) return res.status(400).json({ message: 'Укажите ссылку' });
+    if (url.length > 512) return res.status(400).json({ message: 'Ссылка — не длиннее 512 символов' });
+    res.status(201).json(await FileRepository.addLinkToCard(req.params.cardId, url));
+  })
+);
+
+router.post(
+  '/cards/:cardId/files/upload',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  rawFile,
+  async (req, res) => {
+    let key;
+    try {
+      const body = requireBody(req);
+      const name = readUploadName(req);
+      key = await saveFile(`p${req.projectId}/cards`, name, body);
+      res.status(201).json(await FileRepository.addUploadToCard(req.params.cardId, key, name));
+    } catch (e) {
+      await removeFile(key);
+      sendError(res, e, 'Ошибка загрузки файла');
+    }
+  }
+);
+
+/** Файл по id вложения: проверяем права на карточку, к которой он относится */
+const withFileCard = (permission, handler) => async (req, res) => {
+  try {
+    const file = await FileRepository.findById(req.params.fileId);
+    if (!file) return res.status(404).json({ message: 'Файл не найден' });
+    req.params.cardId = file.kanban_card_id;
+    checkCardAccess(permission)(req, res, async () => {
+      try {
+        await handler(req, res, file);
+      } catch (e) {
+        sendError(res, e, 'Ошибка обработки файла');
+      }
+    });
+  } catch (e) {
+    sendError(res, e, 'Ошибка обработки файла');
+  }
+};
+
+router.get(
+  '/files/:fileId/download',
+  authMiddleware,
+  withFileCard('READ', async (req, res, file) => {
+    if (file.kind !== 'upload') return res.status(400).json({ message: 'Это ссылка — откройте её по адресу' });
+    res.download(resolveKey(file.key), file.name, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ message: 'Файл не найден на сервере' });
+    });
   })
 );
 
 router.delete(
   '/files/:fileId',
   authMiddleware,
-  wrap('Ошибка удаления файла', async (req, res, next) => {
-    const f = await pool.query('SELECT kanban_card_id FROM kanban_card_files WHERE id = $1;', [req.params.fileId]);
-    if (f.rows.length === 0) return res.status(404).json({ message: 'Файл не найден' });
-    req.params.cardId = f.rows[0].kanban_card_id;
-    checkCardAccess('WRITE')(req, res, async () => {
-      try {
-        await FileRepository.deleteFile(req.params.fileId);
-        res.json({ message: 'Файл удалён' });
-      } catch (e) {
-        sendError(res, e, 'Ошибка удаления файла');
-      }
-    });
+  withFileCard('WRITE', async (req, res) => {
+    await FileRepository.deleteFile(req.params.fileId);
+    res.json({ message: 'Файл удалён' });
   })
 );
 

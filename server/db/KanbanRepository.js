@@ -1,4 +1,6 @@
 import { pool } from '../config/db.js';
+import { FileRepository } from './FileRepository.js';
+import { removeFile } from '../utils/fileStore.js';
 
 const CARD_COLUMNS = `c.id, c.kanban_column_id, c.title, c.description, c.card_status_id AS status_id,
   c.work_date, c.position, c.created_at`;
@@ -143,7 +145,14 @@ export class KanbanRepository {
   static async deleteColumn(columnId, { moveToColumnId = null, withCards = false } = {}) {
     const col = await this.findColumn(columnId);
     if (!col) throw new Error('404: Колонка не найдена');
-    return inTransaction(async (client) => {
+    const keys =
+      moveToColumnId == null
+        ? await FileRepository.uploadKeysWhere(
+            'f.kanban_card_id IN (SELECT id FROM kanban_card WHERE kanban_column_id = $1)',
+            [columnId]
+          )
+        : [];
+    const result = await inTransaction(async (client) => {
       const cnt = (await client.query('SELECT COUNT(*)::int AS n FROM kanban_card WHERE kanban_column_id = $1;', [columnId]))
         .rows[0].n;
       if (cnt > 0 && moveToColumnId == null && !withCards) {
@@ -174,6 +183,8 @@ export class KanbanRepository {
       await writeOrder(client, 'kanban_column', rest);
       return { id: Number(columnId), movedCards: moveToColumnId != null ? cnt : 0, deletedCards: moveToColumnId == null ? cnt : 0 };
     });
+    for (const k of keys) await removeFile(k);
+    return result;
   }
 
   // ===== Карточки =========================================================
@@ -254,6 +265,7 @@ export class KanbanRepository {
   static async deleteCard(cardId) {
     const card = await this.findCard(cardId);
     if (!card) return undefined;
+    const keys = await FileRepository.uploadKeysWhere('f.kanban_card_id = $1', [cardId]);
     await inTransaction(async (client) => {
       await client.query('DELETE FROM kanban_card WHERE id = $1;', [cardId]);
       const ids = (
@@ -261,6 +273,7 @@ export class KanbanRepository {
       ).rows.map((r) => r.id);
       await writeOrder(client, 'kanban_card', ids);
     });
+    for (const k of keys) await removeFile(k);
     return { id: card.id };
   }
 

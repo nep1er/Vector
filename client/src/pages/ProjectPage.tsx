@@ -8,6 +8,7 @@ import ProjectSettingsModal from '../components/ProjectSettingsModal';
 import type { SettingsTab } from '../components/ProjectSettingsModal';
 import ProjectShell from '../components/ProjectShell';
 import RoadmapFilters from '../components/RoadmapFilters';
+import StoragesSection from '../components/StoragesSection';
 import TaskInspector from '../components/TaskInspector';
 import Timeline from '../components/Timeline';
 import type { Participant, ProjectDetails, ProjectRole, TaskNode, TaskTag } from '../types';
@@ -164,6 +165,9 @@ export default function ProjectPage() {
           />
         )}
       </div>
+
+      {/* Хранилища живут только на главной RoadMap проекта */}
+      {isRoot && <StoragesSection projectId={pid} canWrite={can('WRITE')} canDelete={can('EXECUTE')} />}
 
       {showCreate && (
         <CreateTaskModal

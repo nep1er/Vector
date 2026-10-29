@@ -15,6 +15,7 @@ import kanbanTagRoutes from './routes/kanbanTagRoutes.js';
 import taskTagRoutes from './routes/taskTagRoutes.js';
 import invitationRoutes from './routes/invitationRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import { MAX_UPLOAD_MB } from './utils/fileStore.js';
 import storageRoutes from './routes/storageRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
 
@@ -59,6 +60,14 @@ app.use('/api/invitations', invitationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/friends', friendRoutes);
+
+// Слишком большой файл — понятный JSON вместо HTML-страницы
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ message: `Файл слишком большой (максимум ${MAX_UPLOAD_MB} МБ)` });
+  }
+  next(err);
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 API Сервер запущен на порту ${PORT}`);

@@ -1931,3 +1931,106 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+/* исправление: глобальное input{width:100%} растягивало чекбокс и сжимало название карточки в столбик */
+.kcard-check,
+.field-check input[type='checkbox'] {
+  width: auto;
+  flex: none;
+}
+.kcard-title {
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ---------- Хранилища ---------- */
+.storages {
+  flex: none;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.storages-title {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-semibold);
+}
+.storages-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.storage-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.storage-card:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-hover);
+}
+.storage-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.storage-count {
+  padding: 0 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+.storage-new {
+  border-style: dashed;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.storage-create {
+  display: inline-flex;
+  gap: 8px;
+}
+.storage-head-grid {
+  grid-template-columns: 1fr 1.5fr auto;
+}
+.storage-files {
+  margin: 12px 0;
+}
+.dropzone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+}
+.dropzone-over {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.attach-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.attach-bar .inline-form {
+  flex: 1;
+  min-width: 220px;
+}

@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { removeProjectDir } from '../utils/fileStore.js';
 import { RoleRepository } from './RoleRepository.js';
 
 // Набор ролей, который создаётся в каждом новом проекте (иерархия из отчёта).
@@ -95,6 +96,7 @@ export class ProjectRepository {
 
   static async deleteProject(projectId) {
     const res = await pool.query('DELETE FROM project WHERE id = $1 RETURNING id', [projectId]);
+    if (res.rows[0]) await removeProjectDir(projectId); // файлы вложений и хранилища
     return res.rows[0];
   }
 

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { StorageRepository } from '../db/StorageRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import {
@@ -6,6 +6,7 @@ import {
   checkStorageAccess,
   checkStorageFileAccess,
 } from '../middleware/rbacMiddleware.js';
+import { MAX_UPLOAD_MB, readUploadName, requireBody, resolveKey, saveFile, removeFile } from '../utils/fileStore.js';
 import { sendError } from '../utils/httpError.js';
 
 const router = Router();
@@ -97,6 +98,61 @@ router.post('/project/:projectId', authMiddleware, checkProjectAccess('WRITE'), 
  *     responses:
  *       200: { description: Запись удалена }
  */
+const rawFile = express.raw({ type: () => true, limit: `${MAX_UPLOAD_MB}mb` });
+
+/**
+ * @swagger
+ * /api/storage/files/{fileId}/download:
+ *   get:
+ *     summary: Скачать загруженный файл (право READ). Для ссылок (LINK) — 400, они открываются по URL
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: fileId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Содержимое файла }
+ * /api/storage/{storageId}/upload:
+ *   post:
+ *     summary: "Загрузить файл в раздел (право WRITE). Тело запроса — сам файл (Content-Type любой, до 25 МБ), имя — в заголовке X-File-Name (URL-encoded)"
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: storageId, required: true, schema: { type: integer } }
+ *       - { in: header, name: X-File-Name, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/octet-stream:
+ *           schema: { type: string, format: binary }
+ *     responses:
+ *       201: { description: Файл сохранён на сервере и добавлен в раздел }
+ */
+router.get('/files/:fileId/download', authMiddleware, checkStorageFileAccess('READ'), async (req, res) => {
+  try {
+    const file = await StorageRepository.findFile(req.params.fileId);
+    if (!file) return res.status(404).json({ message: 'Файл не найден' });
+    if (file.resource_type !== 'FILE') return res.status(400).json({ message: 'Это ссылка — откройте её по адресу' });
+    res.download(resolveKey(file.resource_path), file.name, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ message: 'Файл не найден на сервере' });
+    });
+  } catch (e) {
+    sendError(res, e, 'Ошибка скачивания файла');
+  }
+});
+
+router.post('/:storageId/upload', authMiddleware, checkStorageAccess('WRITE'), rawFile, async (req, res) => {
+  let key;
+  try {
+    const body = requireBody(req);
+    const name = readUploadName(req);
+    key = await saveFile(`p${req.projectId}/storage`, name, body);
+    res.status(201).json(await StorageRepository.addUploadedFile(req.params.storageId, name, key, req.user.id));
+  } catch (e) {
+    await removeFile(key);
+    sendError(res, e, 'Ошибка загрузки файла');
+  }
+});
+
 // Маршруты /files/... идут ДО '/:storageId', чтобы слово "files" не приняли за id раздела
 router.patch('/files/:fileId', authMiddleware, checkStorageFileAccess('WRITE'), async (req, res) => {
   try {
