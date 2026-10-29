@@ -1,23 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { DragEvent, FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { api } from '../api';
-import type { StorageFile, StorageFolder } from '../types';
+import type { ProjectRole, StorageFolder } from '../types';
 import { MAX_UPLOAD_MB, formatSize, tooBig } from '../utils/format';
+import FileDrop from './FileDrop';
+import Dropdown from './Dropdown';
+import FileItem from './FileItem';
 import Icon from './Icon';
 import Modal from './Modal';
 
 interface Props {
   projectId: number;
-  /** WRITE: создавать хранилища, загружать и удалять файлы */
-  canWrite: boolean;
-  /** EXECUTE: удалять хранилища целиком */
-  canDelete: boolean;
+  /** EXECUTE (руководитель): создавать хранилища, загружать, менять, удалять, настраивать видимость */
+  canManage: boolean;
 }
 
 const dateFmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
 
 /** Хранилища проекта — полоса под главной RoadMap. Внутри хранилища: файлы (на сервере) и ссылки. */
-export default function StoragesSection({ projectId, canWrite, canDelete }: Props) {
+export default function StoragesSection({ projectId, canManage }: Props) {
+  const [roles, setRoles] = useState<ProjectRole[]>([]);
   const [folders, setFolders] = useState<StorageFolder[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -35,6 +37,11 @@ export default function StoragesSection({ projectId, canWrite, canDelete }: Prop
   useEffect(() => {
     load();
   }, [load]);
+
+  // Список ролей нужен только тому, кто настраивает видимость
+  useEffect(() => {
+    if (canManage) api.roles.listByProject(projectId).then(setRoles).catch(() => setRoles([]));
+  }, [canManage, projectId]);
 
   const create = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -61,11 +68,16 @@ export default function StoragesSection({ projectId, canWrite, canDelete }: Prop
           <button key={f.id} className="storage-card" onClick={() => setOpenId(f.id)}>
             <Icon name="folder" size={20} />
             <span className="storage-name">{f.name}</span>
+            {f.visible_roles.length > 0 && (
+              <span className="storage-lock" title={`Видят только: ${f.visible_roles.map((r) => r.name).join(', ')}`}>
+                🔒
+              </span>
+            )}
             <span className="storage-count">{f.files.length}</span>
           </button>
         ))}
         {folders.length === 0 && !creating && <span className="muted">Хранилищ пока нет</span>}
-        {canWrite &&
+        {canManage &&
           (creating ? (
             <form className="storage-create" onSubmit={create}>
               <input name="name" autoFocus maxLength={100} placeholder="Название хранилища" onKeyDown={(e) => e.key === 'Escape' && setCreating(false)} />
@@ -86,8 +98,8 @@ export default function StoragesSection({ projectId, canWrite, canDelete }: Prop
       {open && (
         <StorageModal
           folder={open}
-          canWrite={canWrite}
-          canDelete={canDelete}
+          canManage={canManage}
+          roles={roles}
           onChanged={load}
           onClose={() => setOpenId(null)}
         />
@@ -98,25 +110,26 @@ export default function StoragesSection({ projectId, canWrite, canDelete }: Prop
 
 function StorageModal({
   folder,
-  canWrite,
-  canDelete,
+  canManage,
+  roles,
   onChanged,
   onClose,
 }: {
   folder: StorageFolder;
-  canWrite: boolean;
-  canDelete: boolean;
+  canManage: boolean;
+  roles: ProjectRole[];
   onChanged: () => Promise<void>;
   onClose: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(folder.name);
   const [description, setDescription] = useState(folder.description ?? '');
+  const [showLink, setShowLink] = useState(false);
   const [linkName, setLinkName] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null);
-  const [over, setOver] = useState(false);
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -140,51 +153,116 @@ function StorageModal({
     });
   };
 
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setOver(false);
-    if (canWrite) upload([...e.dataTransfer.files]);
-  };
-
-  const rename = (e: FormEvent) => {
+  const saveInfo = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return setError('Введите название');
-    run(() => api.storage.updateFolder(folder.id, { name: name.trim(), description: description.trim() }));
+    run(async () => {
+      await api.storage.updateFolder(folder.id, { name: name.trim(), description: description.trim() });
+      setEditing(false);
+    });
   };
 
-  const dirty = name !== folder.name || description !== (folder.description ?? '');
-
   return (
-    <Modal title={`Хранилище «${folder.name}»`} onClose={onClose} wide>
-      {canWrite && (
-        <form className="card-form" onSubmit={rename}>
-          <div className="card-grid storage-head-grid">
-            <label className="field">
-              <span>Название</span>
-              <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Описание</span>
-              <input value={description} onChange={(e) => setDescription(e.target.value)} />
-            </label>
-            <button className="btn btn-secondary" disabled={busy || !dirty}>
+    <Modal title={folder.name} onClose={onClose} wide>
+      {editing ? (
+        <form className="storage-edit" onSubmit={saveInfo}>
+          <label className="field">
+            <span>Название</span>
+            <input value={name} maxLength={100} autoFocus onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Описание</span>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+          <div className="kadd-actions">
+            <button className="btn btn-primary" disabled={busy}>
               Сохранить
+            </button>
+            <button
+              type="button"
+              className="btn btn-quiet"
+              onClick={() => {
+                setEditing(false);
+                setName(folder.name);
+                setDescription(folder.description ?? '');
+              }}
+            >
+              Отмена
             </button>
           </div>
         </form>
+      ) : (
+        <p className="storage-sub">
+          <span className="muted">{folder.description || 'Без описания'}</span>
+          {canManage && (
+            <button type="button" className="link-btn" onClick={() => setEditing(true)}>
+              Изменить
+            </button>
+          )}
+        </p>
       )}
-      {!canWrite && folder.description && <p className="muted">{folder.description}</p>}
+
+      {canManage ? (
+        <div className="field storage-vis">
+          <span>Кто видит это хранилище</span>
+          <div className="chips">
+            {folder.visible_roles.length === 0 ? (
+              <span className="fchip on-static">Все участники проекта</span>
+            ) : (
+              folder.visible_roles.map((r) => (
+                <span key={r.id} className="fchip on-static">
+                  {r.name}
+                  <button
+                    type="button"
+                    className="chip-x"
+                    aria-label={`Скрыть от роли ${r.name}`}
+                    disabled={busy}
+                    onClick={() =>
+                      run(() => api.storage.setVisibility(folder.id, folder.visible_roles.filter((x) => x.id !== r.id).map((x) => x.id)))
+                    }
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
+            <Dropdown buttonClassName="add-chip" ariaLabel="Выбрать роли" title="Выбрать, кто видит" disabled={busy} button={<Icon name="plus" size={14} />}>
+              <div className="pick-list">
+                <button type="button" className="pick-item" onClick={() => run(() => api.storage.setVisibility(folder.id, []))}>
+                  <span>Все участники проекта</span>
+                  {folder.visible_roles.length === 0 && <Icon name="check" size={16} />}
+                </button>
+                {roles.map((r) => {
+                  const on = folder.visible_roles.some((x) => x.id === r.id);
+                  const next = on ? folder.visible_roles.filter((x) => x.id !== r.id) : [...folder.visible_roles, r];
+                  return (
+                    <button key={r.id} type="button" className="pick-item" onClick={() => run(() => api.storage.setVisibility(folder.id, next.map((x) => x.id)))}>
+                      <span>{r.name}</span>
+                      {on && <Icon name="check" size={16} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </Dropdown>
+          </div>
+          <span className="muted hint">Роль можно выбрать несколько; администраторы видят всё. Участник с несколькими ролями видит хранилище, если подходит любая.</span>
+        </div>
+      ) : (
+        folder.visible_roles.length > 0 && <p className="muted">🔒 Доступно ролям: {folder.visible_roles.map((r) => r.name).join(', ')}</p>
+      )}
 
       {error && <div className="notice notice-err">{error}</div>}
 
-      <ul className="list storage-files">
-        {folder.files.map((f: StorageFile) => (
-          <li key={f.id} className="list-row">
-            <Icon name={f.resource_type === 'FILE' ? 'tasks' : 'globe'} size={18} />
-            <div className="list-main">
-              {renaming?.id === f.id ? (
+      <h3 className="section-title">Содержимое ({folder.files.length})</h3>
+      {folder.files.length === 0 ? (
+        <p className="storage-empty">Здесь пока ничего нет{canManage ? ' — загрузите первый файл ниже.' : '.'}</p>
+      ) : (
+        <ul className="fitems">
+          {folder.files.map((f) =>
+            renaming?.id === f.id ? (
+              <li key={f.id} className="fitem">
                 <form
-                  className="inline-form"
+                  className="inline-form fitem-rename"
                   onSubmit={(e) => {
                     e.preventDefault();
                     const v = renaming.name.trim();
@@ -195,105 +273,84 @@ function StorageModal({
                     });
                   }}
                 >
-                  <input autoFocus value={renaming.name} maxLength={255} onChange={(e) => setRenaming({ id: f.id, name: e.target.value })} onKeyDown={(e) => e.key === 'Escape' && setRenaming(null)} />
-                  <button className="btn btn-secondary" disabled={busy}>
-                    OK
+                  <input
+                    autoFocus
+                    value={renaming.name}
+                    maxLength={255}
+                    aria-label="Новое название"
+                    onChange={(e) => setRenaming({ id: f.id, name: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Escape' && setRenaming(null)}
+                  />
+                  <button className="btn btn-primary" disabled={busy}>
+                    Сохранить
+                  </button>
+                  <button type="button" className="btn btn-quiet" onClick={() => setRenaming(null)}>
+                    Отмена
                   </button>
                 </form>
-              ) : f.resource_type === 'LINK' ? (
-                <a href={f.resource_path} target="_blank" rel="noreferrer noopener">
-                  {f.name}
-                </a>
-              ) : (
-                <button type="button" className="link-btn" onClick={() => run(() => api.storage.download(f.id, f.name))}>
-                  {f.name}
-                </button>
-              )}
-              <span className="muted">
-                {[f.resource_type === 'FILE' ? formatSize(f.size) : 'ссылка', f.uploader_name, dateFmt.format(new Date(f.created_at))]
+              </li>
+            ) : (
+              <FileItem
+                key={f.id}
+                kind={f.resource_type === 'FILE' ? 'file' : 'link'}
+                name={f.name}
+                href={f.resource_path}
+                meta={[f.resource_type === 'FILE' ? formatSize(f.size) : f.resource_path, f.uploader_name, dateFmt.format(new Date(f.created_at))]
                   .filter(Boolean)
                   .join(' · ')}
-              </span>
-            </div>
-            {canWrite && (
-              <span className="comment-actions">
-                <button type="button" className="link-btn" onClick={() => setRenaming({ id: f.id, name: f.name })}>
-                  Переименовать
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label={`Удалить ${f.name}`}
-                  disabled={busy}
-                  onClick={() => window.confirm(`Удалить «${f.name}»?`) && run(() => api.storage.deleteFile(f.id))}
-                >
-                  <Icon name="trash" size={16} />
-                </button>
-              </span>
-            )}
-          </li>
-        ))}
-        {folder.files.length === 0 && <li className="muted">Хранилище пусто</li>}
-      </ul>
-
-      {canWrite && (
-        <>
-          <div
-            className={`dropzone${over ? ' dropzone-over' : ''}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={onDrop}
-          >
-            <span>Перетащите файлы сюда или</span>
-            <label className="btn btn-secondary">
-              Выберите файлы
-              <input
-                type="file"
-                multiple
-                hidden
-                disabled={busy}
-                onChange={(e) => {
-                  const picked = [...(e.target.files ?? [])];
-                  e.target.value = '';
-                  upload(picked);
-                }}
+                busy={busy}
+                onDownload={() => run(() => api.storage.download(f.id, f.name))}
+                onRename={canManage ? () => setRenaming({ id: f.id, name: f.name }) : undefined}
+                onDelete={canManage ? () => window.confirm(`Удалить «${f.name}»?`) && run(() => api.storage.deleteFile(f.id)) : undefined}
               />
-            </label>
-            <span className="muted">до {MAX_UPLOAD_MB} МБ каждый</span>
-          </div>
+            ),
+          )}
+        </ul>
+      )}
 
-          <form
-            className="inline-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const url = linkUrl.trim();
-              if (!url) return;
-              run(async () => {
-                await api.storage.addLink(folder.id, linkName.trim() || url, url);
-                setLinkName('');
-                setLinkUrl('');
-              });
-            }}
-          >
-            <input value={linkName} maxLength={255} placeholder="Название ссылки" onChange={(e) => setLinkName(e.target.value)} />
-            <input value={linkUrl} placeholder="https://github.com/…" onChange={(e) => setLinkUrl(e.target.value)} />
-            <button className="btn btn-secondary" disabled={busy || !linkUrl.trim()}>
-              Добавить ссылку
+      {canManage && (
+        <>
+          <h3 className="section-title">Добавить</h3>
+          <FileDrop onFiles={upload} disabled={busy} />
+          {showLink ? (
+            <form
+              className="storage-link-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const url = linkUrl.trim();
+                if (!url) return;
+                run(async () => {
+                  await api.storage.addLink(folder.id, linkName.trim() || url, url);
+                  setLinkName('');
+                  setLinkUrl('');
+                  setShowLink(false);
+                });
+              }}
+            >
+              <input value={linkUrl} autoFocus placeholder="Адрес: https://github.com/…" onChange={(e) => setLinkUrl(e.target.value)} />
+              <input value={linkName} maxLength={255} placeholder="Название (необязательно)" onChange={(e) => setLinkName(e.target.value)} />
+              <button className="btn btn-primary" disabled={busy || !linkUrl.trim()}>
+                Добавить
+              </button>
+              <button type="button" className="btn btn-quiet" onClick={() => setShowLink(false)}>
+                Отмена
+              </button>
+            </form>
+          ) : (
+            <button type="button" className="link-btn storage-link-toggle" onClick={() => setShowLink(true)}>
+              + Добавить ссылку (GitHub, Figma и т. п.)
             </button>
-          </form>
+          )}
         </>
       )}
 
       <div className="modal-actions card-actions">
-        {canDelete ? (
+        {canManage ? (
           <button
-            className="btn btn-danger"
+            className="link-btn link-danger"
             disabled={busy}
             onClick={() => {
-              if (window.confirm(`Удалить хранилище «${folder.name}» вместе со всеми файлами и ссылками (${folder.files.length})?`)) {
+              if (window.confirm(`Удалить хранилище «${folder.name}» вместе со всем содержимым (${folder.files.length})? Это нельзя отменить.`)) {
                 run(async () => {
                   await api.storage.deleteFolder(folder.id);
                   onClose();

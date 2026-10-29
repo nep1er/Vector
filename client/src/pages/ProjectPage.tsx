@@ -7,6 +7,7 @@ import Icon from '../components/Icon';
 import ProjectSettingsModal from '../components/ProjectSettingsModal';
 import type { SettingsTab } from '../components/ProjectSettingsModal';
 import ProjectShell from '../components/ProjectShell';
+import ShiftModal from '../components/ShiftModal';
 import RoadmapFilters from '../components/RoadmapFilters';
 import StoragesSection from '../components/StoragesSection';
 import TaskInspector from '../components/TaskInspector';
@@ -39,6 +40,7 @@ export default function ProjectPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showShift, setShowShift] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [projectTags, setProjectTags] = useState<TaskTag[]>([]);
   const [projectRoles, setProjectRoles] = useState<ProjectRole[]>([]);
@@ -142,6 +144,7 @@ export default function ProjectPage() {
       onAddMember={() => setShowAddMember(true)}
       onAddTask={() => setShowCreate(true)}
       onSettings={() => setSettingsTab('general')}
+      onShift={() => setShowShift(true)}
       filterSlot={<RoadmapFilters tags={projectTags} value={filters} onChange={setFilters} />}
     >
       <div className={selected ? 'roadmap-layout has-inspector' : 'roadmap-layout'}>
@@ -167,7 +170,7 @@ export default function ProjectPage() {
       </div>
 
       {/* Хранилища живут только на главной RoadMap проекта */}
-      {isRoot && <StoragesSection projectId={pid} canWrite={can('WRITE')} canDelete={can('EXECUTE')} />}
+      {isRoot && <StoragesSection projectId={pid} canManage={can('EXECUTE')} />}
 
       {showCreate && (
         <CreateTaskModal
@@ -180,6 +183,17 @@ export default function ProjectPage() {
             await load();
             setShowCreate(false);
           }}
+        />
+      )}
+
+      {showShift && (
+        <ShiftModal
+          projectId={pid}
+          roadmapId={current.id}
+          roadmapTitle={current.title}
+          canManage={can('EXECUTE')}
+          onClose={() => setShowShift(false)}
+          onChanged={load}
         />
       )}
 

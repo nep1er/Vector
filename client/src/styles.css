@@ -2034,3 +2034,339 @@ select {
   flex: 1;
   min-width: 220px;
 }
+
+/* ---------- Файлы и ссылки: понятные строки со значком типа ---------- */
+.fitems {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.fitem-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: #6b7280;
+}
+.fitem-doc { background: #3b6fb6; }
+.fitem-sheet { background: #2f8f57; }
+.fitem-image { background: #8a5ab8; }
+.fitem-archive { background: #b8832e; }
+.fitem-link { background: var(--color-accent); }
+.fitem-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+.fitem-name {
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fitem-name:hover {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+}
+.fitem-meta {
+  max-width: 100%;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fitem-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.fitem-btn {
+  text-decoration: none;
+}
+.fitem-more {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.fitem-rename {
+  flex: 1;
+}
+.pick-danger {
+  color: var(--color-danger);
+}
+.filedrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 16px;
+  margin-bottom: 8px;
+  text-align: center;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.filedrop:hover,
+.filedrop-over {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.filedrop-compact {
+  padding: 10px 14px;
+}
+.filedrop-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.filedrop-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.storage-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 4px;
+}
+.storage-edit {
+  margin-bottom: 8px;
+}
+.storage-empty {
+  margin: 0 0 12px;
+  padding: 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+.storage-link-toggle {
+  display: inline-block;
+  margin-top: 4px;
+}
+.storage-link-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.storage-link-form input {
+  flex: 1 1 200px;
+}
+.link-danger {
+  color: var(--color-danger);
+}
+@media (max-width: 560px) {
+  .fitem-btn {
+    display: none;
+  }
+}
+
+/* ---------- Вкладка «Задачи» ---------- */
+.tasks-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.tasks-toggle input {
+  width: auto;
+}
+.tproject {
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.tproject-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+}
+.tproject-title a {
+  color: inherit;
+  text-decoration: none;
+}
+.tproject-title a:hover {
+  text-decoration: underline;
+}
+.tproject-count,
+.tsection-count {
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+}
+.tsection {
+  margin-top: 14px;
+  padding-left: 12px;
+  border-left: 4px solid var(--color-border-strong);
+}
+.tsection-soon {
+  border-left-color: #d9a21b;
+}
+.tsection-overdue {
+  border-left-color: var(--color-danger);
+}
+.tsection-current {
+  border-left-color: #4a8fd6;
+}
+.tsection-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+.tsection-hint {
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+.titems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.titem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.titem-type {
+  flex: none;
+  min-width: 70px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  background: #6b7280;
+}
+.titem-type-roadmap {
+  background: var(--color-accent);
+}
+.titem-type-todo {
+  background: #b8832e;
+}
+.titem-type-card {
+  background: #3b6fb6;
+}
+.titem-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.titem-title {
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.titem-sub {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.titem-late {
+  color: var(--color-danger);
+  font-weight: var(--font-weight-semibold);
+}
+.titem-why {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-strong);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.titem-why-mine {
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.titem-go {
+  flex: none;
+  text-decoration: none;
+}
+.storage-lock {
+  font-size: 0.8rem;
+}
+.storage-vis {
+  margin-bottom: 8px;
+}
+@media (max-width: 640px) {
+  .titem {
+    flex-wrap: wrap;
+  }
+  .titem-why {
+    display: none;
+  }
+}
+
+/* ---- Смещение сроков ---- */
+.shift-body { display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow: auto; }
+.shift-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+.shift-dir, .shift-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.shift-preview { border: 1px solid var(--border, rgba(128, 128, 128, 0.3)); padding: 10px 12px; min-height: 60px; }
+.shift-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow: auto; }
+.shift-list li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.shift-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shift-container { opacity: 0.75; font-style: italic; }
+.shift-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.shift-rec { border: 1px solid var(--border, rgba(128, 128, 128, 0.3)); padding: 8px 10px; }
+.shift-rec.reverted { opacity: 0.6; }
+.shift-rec-head { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.shift-days { font-weight: 700; min-width: 84px; }
+.shift-main { flex: 1; }
+.shift-comment { margin: 6px 0 0; font-size: 13px; }
+.shift-detail { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.shift-detail .shift-list { width: 100%; }
+@media (max-width: 640px) { .shift-form { grid-template-columns: 1fr; } }

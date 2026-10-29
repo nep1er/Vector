@@ -16,6 +16,8 @@ import taskTagRoutes from './routes/taskTagRoutes.js';
 import invitationRoutes from './routes/invitationRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import { MAX_UPLOAD_MB } from './utils/fileStore.js';
+import myTasksRoutes from './routes/myTasksRoutes.js';
+import taskShiftRoutes from './routes/taskShiftRoutes.js';
 import storageRoutes from './routes/storageRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
 
@@ -59,6 +61,8 @@ app.use('/api/task-tags', taskTagRoutes); // теги задач RoadMap/ToDo
 app.use('/api/invitations', invitationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/storage', storageRoutes);
+app.use('/api/my-tasks', myTasksRoutes);
+app.use('/api/task-shifts', taskShiftRoutes);
 app.use('/api/friends', friendRoutes);
 
 // Слишком большой файл — понятный JSON вместо HTML-страницы

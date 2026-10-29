@@ -28,7 +28,7 @@ function cleanResource(resourceType, resourcePath) {
  */
 export class StorageRepository {
   /** Все папки проекта вместе с их содержимым */
-  static async listByProject(projectId) {
+  static async listByProject(projectId, { userId = null, seeAll = true } = {}) {
     const res = await pool.query(
       `SELECT ps.id, ps.project_id, ps.name, ps.description, ps.created_at,
               COALESCE(
@@ -42,7 +42,10 @@ export class StorageRepository {
                   'created_at', sf.created_at
                 ) ORDER BY sf.created_at, sf.id) FILTER (WHERE sf.id IS NOT NULL),
                 '[]'::json
-              ) AS files
+              ) AS files,
+              (SELECT COALESCE(json_agg(json_build_object('id', r.id, 'name', r.name) ORDER BY r.name), '[]'::json)
+                 FROM storage_role_visibility v JOIN project_roles r ON r.id = v.project_role_id
+                 WHERE v.project_storage_id = ps.id) AS visible_roles
        FROM project_storage ps
        LEFT JOIN storage_files sf ON sf.project_storage_id = ps.id
        LEFT JOIN users u ON u.id = sf.uploaded_by
@@ -51,8 +54,20 @@ export class StorageRepository {
        ORDER BY ps.name;`,
       [projectId]
     );
+    // Не администратор не видит хранилища, закрытые от всех его ролей
+    let rows = res.rows;
+    if (!seeAll) {
+      const mine = await pool.query(
+        `SELECT ar.project_role_id AS id
+         FROM project_participants pp JOIN assigned_roles ar ON ar.project_participant_id = pp.id
+         WHERE pp.user_id = $1 AND pp.project_id = $2;`,
+        [userId, projectId]
+      );
+      const roleIds = new Set(mine.rows.map((r) => Number(r.id)));
+      rows = rows.filter((f) => f.visible_roles.length === 0 || f.visible_roles.some((r) => roleIds.has(Number(r.id))));
+    }
     // Для загруженных файлов добавляем размер, ключ на диске наружу не отдаём
-    for (const folder of res.rows) {
+    for (const folder of rows) {
       folder.files = await Promise.all(
         folder.files.map(async ({ resource_path, ...f }) =>
           f.resource_type === 'FILE'
@@ -61,7 +76,70 @@ export class StorageRepository {
         )
       );
     }
+    return rows;
+  }
+
+  /** Видит ли пользователь хранилище (нет ограничений по ролям или у него есть одна из ролей) */
+  static async canSee(storageId, userId) {
+    const res = await pool.query(
+      `SELECT (
+         NOT EXISTS (SELECT 1 FROM storage_role_visibility v WHERE v.project_storage_id = $1)
+         OR EXISTS (
+           SELECT 1 FROM storage_role_visibility v
+           JOIN assigned_roles ar ON ar.project_role_id = v.project_role_id
+           JOIN project_participants pp ON pp.id = ar.project_participant_id
+           WHERE v.project_storage_id = $1 AND pp.user_id = $2)
+       ) AS ok;`,
+      [storageId, userId]
+    );
+    return res.rows[0].ok;
+  }
+
+  static async getRoles(storageId, client = pool) {
+    const res = await client.query(
+      `SELECT r.id, r.name FROM storage_role_visibility v
+       JOIN project_roles r ON r.id = v.project_role_id
+       WHERE v.project_storage_id = $1 ORDER BY r.name;`,
+      [storageId]
+    );
     return res.rows;
+  }
+
+  /** Полностью заменяет список ролей. Пустой список = «видно всем» */
+  static async setRoles(storageId, roleIds) {
+    if (!Array.isArray(roleIds)) throw new Error('400: roleIds должен быть массивом');
+    const ids = [...new Set(roleIds.map(Number))];
+    if (ids.some((n) => !Number.isInteger(n))) throw new Error('400: roleIds — целые числа');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const st = await client.query('SELECT project_id FROM project_storage WHERE id = $1 FOR UPDATE;', [storageId]);
+      if (st.rows.length === 0) throw new Error('404: Хранилище не найдено');
+      const projectId = st.rows[0].project_id;
+      if (ids.length > 0) {
+        const ok = await client.query(
+          'SELECT COUNT(*)::int AS n FROM project_roles WHERE project_id = $1 AND id = ANY($2::bigint[]);',
+          [projectId, ids]
+        );
+        if (ok.rows[0].n !== ids.length) throw new Error('400: Одна из ролей не найдена или относится к другому проекту');
+      }
+      await client.query('DELETE FROM storage_role_visibility WHERE project_storage_id = $1;', [storageId]);
+      if (ids.length > 0) {
+        await client.query(
+          `INSERT INTO storage_role_visibility (project_storage_id, project_role_id, project_id)
+           SELECT $1, rid, $3 FROM unnest($2::bigint[]) AS rid;`,
+          [storageId, ids, projectId]
+        );
+      }
+      const roles = await this.getRoles(storageId, client);
+      await client.query('COMMIT');
+      return roles;
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   static async findFile(fileId) {
@@ -79,13 +157,24 @@ export class StorageRepository {
     return res.rows[0];
   }
 
-  static async createFolder(projectId, name, description) {
+  static async createFolder(projectId, name, description, roleIds = []) {
     const res = await pool.query(
       `INSERT INTO project_storage (project_id, name, description)
        VALUES ($1, $2, $3) RETURNING *;`,
       [projectId, cleanText(name, 'Название раздела', 100), description ? String(description).trim() : null]
     );
-    return res.rows[0];
+    const folder = res.rows[0];
+    if (roleIds.length > 0) {
+      try {
+        folder.visible_roles = await this.setRoles(folder.id, roleIds);
+      } catch (e) {
+        await pool.query('DELETE FROM project_storage WHERE id = $1;', [folder.id]);
+        throw e;
+      }
+    } else {
+      folder.visible_roles = [];
+    }
+    return folder;
   }
 
   static async updateFolder(storageId, { name, description }) {

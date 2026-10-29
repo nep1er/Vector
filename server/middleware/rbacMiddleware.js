@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { RoleRepository } from '../db/RoleRepository.js';
+import { StorageRepository } from '../db/StorageRepository.js';
 import { TaskRepository } from '../db/TaskRepository.js';
 import { TaskVisibilityRepository } from '../db/TaskVisibilityRepository.js';
 import { sendError } from '../utils/httpError.js';
@@ -103,6 +104,14 @@ export const checkTaskTagAccess = accessByParam(
   'тега'
 );
 
+/** /task-shifts/:shiftId */
+export const checkShiftAccess = accessByParam(
+  'shiftId',
+  'SELECT project_id FROM task_shift WHERE id = $1',
+  'Смещение не найдено',
+  'смещения'
+);
+
 /** Проект карточки Канбана: карточка -> колонка -> ToDo-задача -> проект */
 const CARD_PROJECT_JOIN = `
   FROM kanban_card c
@@ -113,7 +122,13 @@ const CARD_PROJECT_JOIN = `
  * Как accessByParam, но SQL возвращает ещё и task_id (ToDo-задача): если ToDo скрыта
  * от ролей пользователя, объекты на её доске для него «не существуют» (кроме ADMIN).
  */
-const accessByParamInTodo = (paramName, sql, notFoundMessage, label) => (requiredPermission) =>
+const accessByParamInTodo = (
+  paramName,
+  sql,
+  notFoundMessage,
+  label,
+  canSee = (objectId, userId) => TaskVisibilityRepository.canSee(objectId, userId)
+) => (requiredPermission) =>
   async (req, res, next) => {
     try {
       const id = Number(req.params[paramName]);
@@ -123,7 +138,7 @@ const accessByParamInTodo = (paramName, sql, notFoundMessage, label) => (require
       const { project_id: projectId, task_id: taskId } = found.rows[0];
       const afterAuth = async () => {
         try {
-          if (!req.userPermissions.includes('ADMIN') && !(await TaskVisibilityRepository.canSee(taskId, req.user.id))) {
+          if (!req.userPermissions.includes('ADMIN') && !(await canSee(taskId, req.user.id))) {
             return res.status(404).json({ message: notFoundMessage });
           }
           next();
@@ -171,21 +186,23 @@ export const checkCommentAccess = accessByParam(
   'комментария'
 );
 
-/** /storage/:storageId/... */
-export const checkStorageAccess = accessByParam(
+/** /storage/:storageId/... — хранилище, закрытое от ролей пользователя, для него «не существует» (кроме ADMIN) */
+export const checkStorageAccess = accessByParamInTodo(
   'storageId',
-  'SELECT project_id FROM project_storage WHERE id = $1',
+  'SELECT project_id, id AS task_id FROM project_storage WHERE id = $1',
   'Раздел хранилища не найден',
-  'раздела'
+  'раздела',
+  (id, userId) => StorageRepository.canSee(id, userId)
 );
 
 /** /storage/files/:fileId */
-export const checkStorageFileAccess = accessByParam(
+export const checkStorageFileAccess = accessByParamInTodo(
   'fileId',
-  `SELECT ps.project_id
+  `SELECT ps.project_id, ps.id AS task_id
    FROM storage_files sf
    JOIN project_storage ps ON ps.id = sf.project_storage_id
    WHERE sf.id = $1`,
   'Файл не найден',
-  'файла'
+  'файла',
+  (id, userId) => StorageRepository.canSee(id, userId)
 );

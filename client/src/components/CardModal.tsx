@@ -6,6 +6,8 @@ import type { CardComment, CardFile, KanbanCard, KanbanColumn, KanbanTag, Partic
 import Avatar from './Avatar';
 import Dropdown from './Dropdown';
 import Icon from './Icon';
+import FileDrop from './FileDrop';
+import FileItem from './FileItem';
 import Modal from './Modal';
 import { MAX_UPLOAD_MB, formatSize, tooBig } from '../utils/format';
 
@@ -15,7 +17,12 @@ interface Props {
   columns: KanbanColumn[];
   projectTags: KanbanTag[];
   participants: Participant[];
+  /** EXECUTE (руководитель): править карточку, теги, исполнителей, вложения */
   canEdit: boolean;
+  /** WRITE (участник): переносить в другую колонку */
+  canMove: boolean;
+  /** WRITE (участник): писать комментарии */
+  canComment: boolean;
   /** Admin может удалять чужие комментарии */
   isAdmin: boolean;
   onChanged: () => Promise<void>;
@@ -26,7 +33,7 @@ const when = (iso: string) =>
   new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Окно карточки: все поля, теги, исполнители, перенос в другую колонку, файлы и комментарии. */
-export default function CardModal({ card, projectId, columns, projectTags, participants, canEdit, isAdmin, onChanged, onClose }: Props) {
+export default function CardModal({ card, projectId, columns, projectTags, participants, canEdit, canMove, canComment, isAdmin, onChanged, onClose }: Props) {
   const { user } = useAuth();
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description ?? '');
@@ -38,6 +45,7 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
   const [newComment, setNewComment] = useState('');
   const [editingComment, setEditingComment] = useState<{ id: number; text: string } | null>(null);
   const [newFile, setNewFile] = useState('');
+  const [showLink, setShowLink] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState('#4a8fd6');
 
@@ -105,7 +113,7 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
             <span>Колонка</span>
             <select
               value={card.kanban_column_id}
-              disabled={!canEdit || busy}
+              disabled={!canMove || busy}
               onChange={(e) => run(() => api.kanban.moveCard(card.id, Number(e.target.value)))}
             >
               {columns.map((c) => (
@@ -260,73 +268,65 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
       </form>
 
       <h3 className="section-title">Вложения ({files.length})</h3>
-      <ul className="list">
-        {files.map((f) => (
-          <li key={f.id} className="list-row">
-            <div className="list-main">
-              {f.kind === 'link' ? (
-                <a href={f.url ?? '#'} target="_blank" rel="noreferrer noopener">
-                  {f.name}
-                </a>
-              ) : f.kind === 'upload' ? (
-                <button type="button" className="link-btn" onClick={() => run(() => api.kanban.downloadCardFile(f.id, f.name))}>
-                  {f.name}
-                </button>
-              ) : (
-                <span>{f.name}</span>
-              )}
-              <span className="muted">
-                {f.kind === 'upload' ? formatSize(f.size) : f.kind === 'link' ? 'ссылка' : ''}
-              </span>
-            </div>
-            {canEdit && (
-              <button className="icon-btn" aria-label={`Удалить вложение ${f.name}`} disabled={busy} onClick={() => run(() => api.kanban.deleteFile(f.id), true)}>
-                <Icon name="trash" size={16} />
-              </button>
-            )}
-          </li>
-        ))}
-        {files.length === 0 && <li className="muted">Нет вложений</li>}
-      </ul>
-      {canEdit && (
-        <div className="attach-bar">
-          <label className="btn btn-secondary attach-pick">
-            Прикрепить файлы
-            <input
-              type="file"
-              multiple
-              hidden
-              disabled={busy}
-              onChange={(e) => {
-                const picked = [...(e.target.files ?? [])];
-                e.target.value = '';
-                if (picked.length === 0) return;
-                const big = picked.find(tooBig);
-                if (big) return setError(`Файл «${big.name}» больше ${MAX_UPLOAD_MB} МБ`);
-                run(async () => {
-                  for (const file of picked) await api.kanban.uploadCardFile(card.id, file);
-                }, true);
-              }}
+      {files.length > 0 && (
+        <ul className="fitems">
+          {files.map((f) => (
+            <FileItem
+              key={f.id}
+              kind={f.kind === 'upload' ? 'file' : 'link'}
+              name={f.name}
+              href={f.url}
+              meta={f.kind === 'upload' ? `${formatSize(f.size)} · ${when(f.uploaded_at)}` : `Ссылка · ${when(f.uploaded_at)}`}
+              busy={busy}
+              onDownload={() => run(() => api.kanban.downloadCardFile(f.id, f.name))}
+              onDelete={canEdit ? () => window.confirm(`Удалить вложение «${f.name}»?`) && run(() => api.kanban.deleteFile(f.id), true) : undefined}
             />
-          </label>
-          <form
-            className="inline-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const v = newFile.trim();
-              if (!v) return;
+          ))}
+        </ul>
+      )}
+      {files.length === 0 && !canEdit && <p className="muted">Нет вложений</p>}
+      {canEdit && (
+        <>
+          <FileDrop
+            compact
+            disabled={busy}
+            onFiles={(picked) => {
+              if (picked.length === 0) return;
+              const big = picked.find(tooBig);
+              if (big) return setError(`Файл «${big.name}» больше ${MAX_UPLOAD_MB} МБ`);
               run(async () => {
-                await api.kanban.addCardLink(card.id, v);
-                setNewFile('');
+                for (const file of picked) await api.kanban.uploadCardFile(card.id, file);
               }, true);
             }}
-          >
-            <input value={newFile} maxLength={512} placeholder="…или ссылка (https://…)" onChange={(e) => setNewFile(e.target.value)} />
-            <button className="btn btn-secondary" disabled={busy || !newFile.trim()}>
-              Добавить
+          />
+          {showLink ? (
+            <form
+              className="inline-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const v = newFile.trim();
+                if (!v) return;
+                run(async () => {
+                  await api.kanban.addCardLink(card.id, v);
+                  setNewFile('');
+                  setShowLink(false);
+                }, true);
+              }}
+            >
+              <input autoFocus value={newFile} maxLength={512} placeholder="https://…" onChange={(e) => setNewFile(e.target.value)} />
+              <button className="btn btn-primary" disabled={busy || !newFile.trim()}>
+                Добавить
+              </button>
+              <button type="button" className="btn btn-quiet" onClick={() => setShowLink(false)}>
+                Отмена
+              </button>
+            </form>
+          ) : (
+            <button type="button" className="link-btn storage-link-toggle" onClick={() => setShowLink(true)}>
+              + Добавить ссылку
             </button>
-          </form>
-        </div>
+          )}
+        </>
       )}
 
       <h3 className="section-title">Комментарии ({comments.length})</h3>
@@ -343,7 +343,7 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
                     {when(c.created_at)}
                     {c.updated_at ? ' · изменён' : ''}
                   </span>
-                  {canEdit && (mine || isAdmin) && (
+                  {canComment && (mine || isAdmin) && (
                     <span className="comment-actions">
                       {mine && (
                         <button type="button" className="link-btn" onClick={() => setEditingComment({ id: c.id, text: c.content })}>
@@ -386,7 +386,7 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
         })}
         {comments.length === 0 && <li className="muted">Комментариев пока нет</li>}
       </ul>
-      {canEdit && (
+      {canComment && (
         <form
           onSubmit={(e) => {
             e.preventDefault();

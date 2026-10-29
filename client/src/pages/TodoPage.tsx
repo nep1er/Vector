@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import AddMemberModal from '../components/AddMemberModal';
 import CardModal from '../components/CardModal';
@@ -24,6 +24,7 @@ export default function TodoPage() {
   const { projectId, todoId } = useParams();
   const pid = Number(projectId);
   const tid = Number(todoId);
+  const [searchParams] = useSearchParams();
 
   const [project, setProject] = useState<ProjectDetails | null>(null);
   const [tree, setTree] = useState<TaskNode[]>([]);
@@ -62,8 +63,11 @@ export default function TodoPage() {
 
   useEffect(() => {
     setLoading(true);
-    setOpenCardId(null);
+    // ссылка из вкладки «Задачи» (?card=ID) сразу открывает нужную карточку
+    const fromLink = Number(searchParams.get('card'));
+    setOpenCardId(Number.isInteger(fromLink) && fromLink > 0 ? fromLink : null);
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   // Подтягиваем изменения других участников, пока доска открыта и вкладка активна
@@ -94,7 +98,8 @@ export default function TodoPage() {
 
   const can = (permission: string) =>
     project.permissions.includes(permission) || project.permissions.includes('ADMIN');
-  const canEdit = can('WRITE');
+  const canMove = can('WRITE'); // участник: двигать карточки, комментировать
+  const canManage = can('EXECUTE'); // руководитель: колонки, карточки, теги, вложения
 
   const openCard = columns.flatMap((c) => c.cards).find((c) => c.id === openCardId) ?? null;
 
@@ -115,7 +120,7 @@ export default function TodoPage() {
       crumbs={crumbs}
       participants={participants}
       canInvite={can('ADMIN')}
-      canAddTask={canEdit}
+      canAddTask={canManage}
       addLabel="Добавить колонку"
       canSettings
       canManage={can('ADMIN')}
@@ -136,7 +141,8 @@ export default function TodoPage() {
         key={addColumnSignal /* кнопка «+» в панели открывает форму новой колонки */}
         todoId={tid}
         columns={columns}
-        canEdit={canEdit}
+        canMove={canMove}
+        canManage={canManage}
         startAddingColumn={addColumnSignal > 0}
         onReload={load}
         onOpenCard={(c) => setOpenCardId(c.id)}
@@ -150,7 +156,9 @@ export default function TodoPage() {
           columns={columns}
           projectTags={tags}
           participants={participants}
-          canEdit={canEdit}
+          canEdit={canManage}
+          canMove={canMove}
+          canComment={canMove}
           isAdmin={can('ADMIN')}
           onChanged={load}
           onClose={() => setOpenCardId(null)}

@@ -129,6 +129,8 @@ export interface StorageFolder {
   name: string;
   description: string | null;
   created_at: string;
+  /** Роли, которым видно хранилище; пустой список — видно всем */
+  visible_roles: { id: number; name: string }[];
   files: StorageFile[];
 }
 
@@ -202,4 +204,74 @@ export interface AppNotification {
   read_at: string | null;
   /** только для PROJECT_INVITATION: PENDING / ACCEPTED / DECLINED ... */
   invitation_status: string | null;
+}
+
+/** Элемент вкладки «Задачи» (GET /api/my-tasks) */
+export type MyTaskBucket = 'soon' | 'current' | 'overdue';
+
+export interface MyTaskItem {
+  kind: 'task' | 'card';
+  id: number;
+  /** id ToDo/RoadMap-задачи; для карточки — id её ToDo */
+  task_id: number;
+  type: 'ROADMAP' | 'TODO' | 'CARD';
+  title: string;
+  status_id: number | null;
+  due_date: string | null;
+  bucket: MyTaskBucket;
+  /** Вы — исполнитель карточки */
+  mine: boolean;
+  /** Задача открыта именно вашим ролям */
+  targeted: boolean;
+  parent_title?: string;
+  column_title?: string;
+}
+
+export interface MyTasksProject {
+  project: { id: number; title: string };
+  items: MyTaskItem[];
+}
+
+// ---- Смещение сроков ----
+export interface ShiftItem {
+  id: number;
+  task_id: number | null;
+  task_title: string;
+  task_type: string;
+  is_container: boolean;
+  old_start: string | null;
+  old_end: string | null;
+  new_start: string | null;
+  new_end: string | null;
+}
+
+export interface ShiftPlanItem {
+  id: number;
+  title: string;
+  type: string;
+  old_start: string | null;
+  old_end: string | null;
+  new_start: string | null;
+  new_end: string | null;
+  is_container: boolean;
+}
+
+export interface ShiftPlan {
+  scope: { id: number; title: string };
+  items: ShiftPlanItem[];
+  containers: ShiftPlanItem[];
+}
+
+export interface ShiftRecord {
+  id: number;
+  roadmap_id: number | null;
+  roadmap_title: string;
+  from_date: string;
+  shift_days: number;
+  tasks_count: number;
+  comment: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  reverted_at: string | null;
+  reverted_by_name: string | null;
 }

@@ -9,7 +9,10 @@ import Modal from './Modal';
 interface Props {
   todoId: number;
   columns: KanbanColumn[];
-  canEdit: boolean;
+  /** WRITE (участник): перемещать карточки */
+  canMove: boolean;
+  /** EXECUTE (руководитель): создавать и менять колонки и карточки */
+  canManage: boolean;
   /** Сразу открыть форму новой колонки */
   startAddingColumn?: boolean;
   /** Перезагрузить доску с сервера (после любого изменения) */
@@ -27,7 +30,7 @@ const isOverdue = (c: KanbanCard) => c.status_id !== 1 && !!c.work_date && new D
  * Канбан-доска: колонки слева направо, карточки сверху вниз.
  * Карточки и колонки перетаскиваются мышью (HTML5 drag&drop); у колонок есть и кнопки «влево/вправо».
  */
-export default function KanbanBoard({ todoId, columns, canEdit, startAddingColumn = false, onReload, onOpenCard, onError }: Props) {
+export default function KanbanBoard({ todoId, columns, canMove, canManage, startAddingColumn = false, onReload, onOpenCard, onError }: Props) {
   const [cols, setCols] = useState<KanbanColumn[]>(columns);
   const drag = useRef<Drag>(null);
   const [drop, setDrop] = useState<{ colId: number; index: number } | null>(null);
@@ -170,7 +173,7 @@ export default function KanbanBoard({ todoId, columns, canEdit, startAddingColum
         >
           <header
             className="kcol-head"
-            draggable={canEdit && editingColumn !== col.column_id}
+            draggable={canManage && editingColumn !== col.column_id}
             onDragStart={(e) => {
               drag.current = { type: 'column', id: col.column_id };
               e.dataTransfer.effectAllowed = 'move';
@@ -201,14 +204,14 @@ export default function KanbanBoard({ todoId, columns, canEdit, startAddingColum
             ) : (
               <h3
                 className="kcol-title"
-                title={canEdit ? 'Нажмите, чтобы переименовать' : undefined}
-                onClick={() => canEdit && setEditingColumn(col.column_id)}
+                title={canManage ? 'Нажмите, чтобы переименовать' : undefined}
+                onClick={() => canManage && setEditingColumn(col.column_id)}
               >
                 {col.column_title}
               </h3>
             )}
             <span className="kcol-count">{col.cards.length}</span>
-            {canEdit && (
+            {canManage && (
               <span className="kcol-actions">
                 <button className="icon-btn" aria-label="Сдвинуть колонку влево" title="Влево" disabled={ci === 0} onClick={() => moveColumn(col, -1)}>
                   ‹
@@ -243,7 +246,7 @@ export default function KanbanBoard({ todoId, columns, canEdit, startAddingColum
                 <article
                   data-card-id={card.id}
                   className={`kcard${card.status_id === 1 ? ' kcard-done' : ''}`}
-                  draggable={canEdit}
+                  draggable={canMove}
                   tabIndex={0}
                   onDragStart={(e) => {
                     drag.current = { type: 'card', id: card.id, from: col.column_id };
@@ -262,7 +265,7 @@ export default function KanbanBoard({ todoId, columns, canEdit, startAddingColum
                     </div>
                   )}
                   <div className="kcard-title-row">
-                    {canEdit && (
+                    {canManage && (
                       <input
                         type="checkbox"
                         className="kcard-check"
@@ -299,7 +302,7 @@ export default function KanbanBoard({ todoId, columns, canEdit, startAddingColum
             {col.cards.length === 0 && !drop && <p className="kcol-empty">Нет карточек</p>}
           </div>
 
-          {canEdit &&
+          {canManage &&
             (adding === col.column_id ? (
               <form
                 className="kadd-form"
@@ -343,7 +346,7 @@ export default function KanbanBoard({ todoId, columns, canEdit, startAddingColum
 
       {colDrop === cols.length && <div className="kcol-drop-end" />}
 
-      {canEdit && (
+      {canManage && (
         <div className="kcol kcol-new">
           {addingColumn ? (
             <form onSubmit={addColumn}>

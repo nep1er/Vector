@@ -31,6 +31,7 @@ export type IconName =
   | 'users'
   | 'user-plus'
   | 'filter'
+  | 'shift'
   | 'theme'
   | 'chevron-down';
 

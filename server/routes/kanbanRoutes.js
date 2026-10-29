@@ -16,8 +16,8 @@ import { sendError } from '../utils/httpError.js';
 const router = Router();
 
 /*
- * Права: просмотр доски и карточек — READ; любые изменения (колонки, карточки, перемещение,
- * исполнители, теги, файлы, комментарии) — WRITE. Если ToDo-задача скрыта от ролей
+ * Права: просмотр доски и карточек — READ; перемещение карточек и комментарии — WRITE (участник);
+ * всё остальное — создание и правка колонок и карточек, исполнители, теги, вложения — EXECUTE (руководитель). Если ToDo-задача скрыта от ролей
  * пользователя (видимость задачи), её доска для него недоступна (404), кроме ADMIN.
  */
 
@@ -56,7 +56,7 @@ router.get(
  * @swagger
  * /api/kanban/columns:
  *   post:
- *     summary: Создать колонку (без position — в конец; position с 1 — вставка на это место). Право WRITE
+ *     summary: Создать колонку (без position — в конец; position с 1 — вставка на это место). Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
@@ -76,7 +76,7 @@ router.get(
 router.post(
   '/columns',
   authMiddleware,
-  checkTaskAccess('WRITE', (req) => req.body?.todoTaskId),
+  checkTaskAccess('EXECUTE', (req) => req.body?.todoTaskId),
   wrap('Ошибка создания колонки', async (req, res) => {
     const t = await pool.query(`SELECT type FROM task WHERE id = $1;`, [req.body.todoTaskId]);
     if (t.rows[0]?.type !== 'TODO') return res.status(400).json({ message: 'Это не ToDo-задача — у неё нет доски' });
@@ -88,7 +88,7 @@ router.post(
  * @swagger
  * /api/kanban/columns/{columnId}:
  *   patch:
- *     summary: Переименовать и/или переместить колонку (position — новое место с 1). Право WRITE
+ *     summary: Переименовать и/или переместить колонку (position — новое место с 1). Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -104,7 +104,7 @@ router.post(
  *     responses:
  *       200: { description: Колонка обновлена }
  *   delete:
- *     summary: "Удалить колонку. Если в ней есть карточки: ?moveTo=<id колонки> переносит их, ?withCards=true удаляет вместе с ними, иначе 409. Право WRITE"
+ *     summary: "Удалить колонку. Если в ней есть карточки: ?moveTo=<id колонки> переносит их, ?withCards=true удаляет вместе с ними, иначе 409. Право EXECUTE (руководитель)"
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -118,7 +118,7 @@ router.post(
 router.patch(
   '/columns/:columnId',
   authMiddleware,
-  checkColumnAccess('WRITE'),
+  checkColumnAccess('EXECUTE'),
   wrap('Ошибка обновления колонки', async (req, res) => {
     res.json(await KanbanRepository.updateColumn(req.params.columnId, req.body ?? {}));
   })
@@ -127,7 +127,7 @@ router.patch(
 router.delete(
   '/columns/:columnId',
   authMiddleware,
-  checkColumnAccess('WRITE'),
+  checkColumnAccess('EXECUTE'),
   wrap('Ошибка удаления колонки', async (req, res) => {
     const moveTo = req.query.moveTo != null ? Number(req.query.moveTo) : null;
     if (moveTo !== null && !Number.isInteger(moveTo)) return res.status(400).json({ message: 'Некорректный moveTo' });
@@ -141,7 +141,7 @@ router.delete(
  * @swagger
  * /api/kanban/cards:
  *   post:
- *     summary: Создать карточку в конце колонки (теги и исполнители — необязательно). Право WRITE
+ *     summary: Создать карточку в конце колонки (теги и исполнители — необязательно). Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
@@ -166,7 +166,7 @@ router.post(
   authMiddleware,
   (req, res, next) => {
     req.params.columnId = req.body?.columnId;
-    checkColumnAccess('WRITE')(req, res, next);
+    checkColumnAccess('EXECUTE')(req, res, next);
   },
   wrap('Ошибка создания карточки', async (req, res) => {
     const { columnId, ...rest } = req.body;
@@ -178,7 +178,7 @@ router.post(
  * @swagger
  * /api/kanban/cards/{cardId}/move:
  *   patch:
- *     summary: Переместить карточку в колонку targetColumnId на место index (с 0; без index — в конец). Право WRITE
+ *     summary: Переместить карточку в колонку targetColumnId на место index (с 0; без index — в конец). Право WRITE (участник)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -212,7 +212,7 @@ router.patch(
  * @swagger
  * /api/kanban/cards/{cardId}/details:
  *   patch:
- *     summary: Изменить название, описание, дату (description и workDate можно очистить, передав null). Право WRITE
+ *     summary: Изменить название, описание, дату (description и workDate можно очистить, передав null). Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -230,7 +230,7 @@ router.patch(
  *       200: { description: Карточка обновлена }
  * /api/kanban/cards/{cardId}/status:
  *   patch:
- *     summary: "Отметить карточку выполненной / невыполненной (card_status_id). Право WRITE"
+ *     summary: "Отметить карточку выполненной / невыполненной (card_status_id). Право EXECUTE (руководитель)"
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -248,7 +248,7 @@ router.patch(
  *       200: { description: Статус обновлён }
  * /api/kanban/cards/{cardId}:
  *   delete:
- *     summary: Удалить карточку. Право WRITE
+ *     summary: Удалить карточку. Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -259,7 +259,7 @@ router.patch(
 router.patch(
   '/cards/:cardId/details',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка обновления карточки', async (req, res) => {
     res.json(await KanbanRepository.updateCardDetails(req.params.cardId, req.body ?? {}));
   })
@@ -268,7 +268,7 @@ router.patch(
 router.patch(
   '/cards/:cardId/status',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка смены статуса карточки', async (req, res) => {
     res.json(await KanbanRepository.updateCardStatus(req.params.cardId, req.body?.cardStatusId));
   })
@@ -277,7 +277,7 @@ router.patch(
 router.delete(
   '/cards/:cardId',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка удаления карточки', async (req, res) => {
     const deleted = await KanbanRepository.deleteCard(req.params.cardId);
     if (!deleted) return res.status(404).json({ message: 'Карточка не найдена' });
@@ -289,7 +289,7 @@ router.delete(
  * @swagger
  * /api/kanban/cards/{cardId}/participants:
  *   post:
- *     summary: Назначить исполнителя карточки (projectParticipantId из GET /participants → participant_id). Право WRITE
+ *     summary: Назначить исполнителя карточки (projectParticipantId из GET /participants → participant_id). Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -306,7 +306,7 @@ router.delete(
  *     responses:
  *       201: { description: Исполнитель назначен }
  *   delete:
- *     summary: Снять исполнителя с карточки. Право WRITE
+ *     summary: Снять исполнителя с карточки. Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -324,7 +324,7 @@ router.delete(
  *       200: { description: Исполнитель снят }
  * /api/kanban/cards/{cardId}/tags/{tagId}:
  *   post:
- *     summary: Повесить тег Канбана на карточку (тег должен быть из того же проекта). Право WRITE
+ *     summary: Повесить тег Канбана на карточку (тег должен быть из того же проекта). Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -333,7 +333,7 @@ router.delete(
  *     responses:
  *       201: { description: Тег добавлен }
  *   delete:
- *     summary: Снять тег с карточки. Право WRITE
+ *     summary: Снять тег с карточки. Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -345,7 +345,7 @@ router.delete(
 router.post(
   '/cards/:cardId/participants',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка добавления исполнителя', async (req, res) => {
     res.status(201).json(await KanbanRepository.addCardParticipant(req.params.cardId, req.body?.projectParticipantId));
   })
@@ -354,7 +354,7 @@ router.post(
 router.delete(
   '/cards/:cardId/participants',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка снятия исполнителя', async (req, res) => {
     await KanbanRepository.removeCardParticipant(req.params.cardId, req.body?.projectParticipantId);
     res.json({ message: 'Исполнитель снят' });
@@ -364,7 +364,7 @@ router.delete(
 router.post(
   '/cards/:cardId/tags/:tagId',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка добавления тега', async (req, res) => {
     res.status(201).json(await KanbanRepository.applyTag(req.params.cardId, req.params.tagId));
   })
@@ -373,7 +373,7 @@ router.post(
 router.delete(
   '/cards/:cardId/tags/:tagId',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка снятия тега', async (req, res) => {
     await KanbanRepository.removeTag(req.params.cardId, req.params.tagId);
     res.json({ message: 'Тег снят' });
@@ -392,7 +392,7 @@ router.delete(
  *     responses:
  *       200: { description: Список файлов }
  *   post:
- *     summary: Прикрепить внешнюю ссылку к карточке (файлы — через /files/upload). Право WRITE
+ *     summary: Прикрепить внешнюю ссылку к карточке (файлы — через /files/upload). Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -410,7 +410,7 @@ router.delete(
  *       201: { description: Файл добавлен }
  * /api/kanban/cards/{cardId}/files/upload:
  *   post:
- *     summary: "Загрузить файл на сервер и прикрепить к карточке (WRITE). Тело — сам файл до 25 МБ, имя — в заголовке X-File-Name (URL-encoded)"
+ *     summary: "Загрузить файл на сервер и прикрепить к карточке (EXECUTE). Тело — сам файл до 25 МБ, имя — в заголовке X-File-Name (URL-encoded)"
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -434,7 +434,7 @@ router.delete(
  *       200: { description: Содержимое файла }
  * /api/kanban/files/{fileId}:
  *   delete:
- *     summary: Удалить файл карточки. Право WRITE
+ *     summary: Удалить файл карточки. Право EXECUTE (руководитель)
  *     tags: [Kanban]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -456,7 +456,7 @@ const rawFile = express.raw({ type: () => true, limit: `${MAX_UPLOAD_MB}mb` });
 router.post(
   '/cards/:cardId/files',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   wrap('Ошибка добавления ссылки', async (req, res) => {
     const url = String(req.body?.url ?? req.body?.filePath ?? '').trim();
     if (!url) return res.status(400).json({ message: 'Укажите ссылку' });
@@ -468,7 +468,7 @@ router.post(
 router.post(
   '/cards/:cardId/files/upload',
   authMiddleware,
-  checkCardAccess('WRITE'),
+  checkCardAccess('EXECUTE'),
   rawFile,
   async (req, res) => {
     let key;
@@ -516,7 +516,7 @@ router.get(
 router.delete(
   '/files/:fileId',
   authMiddleware,
-  withFileCard('WRITE', async (req, res) => {
+  withFileCard('EXECUTE', async (req, res) => {
     await FileRepository.deleteFile(req.params.fileId);
     res.json({ message: 'Файл удалён' });
   })

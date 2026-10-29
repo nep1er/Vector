@@ -76,7 +76,7 @@ router.get('/project/:projectId', authMiddleware, checkProjectAccess('READ'), as
   }
 });
 
-router.post('/project/:projectId', authMiddleware, checkProjectAccess('WRITE'), async (req, res) => {
+router.post('/project/:projectId', authMiddleware, checkProjectAccess('EXECUTE'), async (req, res) => {
   try {
     const { name, color } = req.body;
     if (!name || !String(name).trim()) {
@@ -125,7 +125,7 @@ router.post('/project/:projectId', authMiddleware, checkProjectAccess('WRITE'), 
  */
 const cardFromBody = (req, res, next) => {
   req.params.cardId = req.body?.cardId;
-  checkCardAccess('WRITE')(req, res, next);
+  checkCardAccess('EXECUTE')(req, res, next);
 };
 
 router.post('/apply', authMiddleware, cardFromBody, async (req, res) => {
@@ -194,7 +194,7 @@ router.delete('/remove-from-card', authMiddleware, cardFromBody, async (req, res
  *       200:
  *         description: Тег полностью удален из проекта
  */
-router.delete('/:tagId', authMiddleware, checkKanbanTagAccess('WRITE'), async (req, res) => {
+router.delete('/:tagId', authMiddleware, checkKanbanTagAccess('EXECUTE'), async (req, res) => {
   try {
     const deleted = await KanbanTagRepository.deleteTag(req.params.tagId);
     if (!deleted) return res.status(404).json({ message: 'Тег не найден' });
@@ -228,7 +228,7 @@ router.delete('/:tagId', authMiddleware, checkKanbanTagAccess('WRITE'), async (r
  *     responses:
  *       200: { description: Тег обновлен }
  */
-router.patch('/:tagId/details', authMiddleware, checkKanbanTagAccess('WRITE'), async (req, res) => {
+router.patch('/:tagId/details', authMiddleware, checkKanbanTagAccess('EXECUTE'), async (req, res) => {
   try {
     const { name, colorCode } = req.body;
     const updated = await KanbanTagRepository.updateTagDetails(req.params.tagId, { name, colorCode });

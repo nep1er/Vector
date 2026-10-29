@@ -9,6 +9,10 @@ import type {
   AuthResponse,
   CardComment,
   CardFile,
+  MyTasksProject,
+  ShiftItem,
+  ShiftPlan,
+  ShiftRecord,
   StorageFile,
   StorageFolder,
   KanbanColumn,
@@ -456,8 +460,12 @@ const friends = {
 const storage = {
   list: (projectId: number) => request<StorageFolder[]>('GET', `/api/storage/project/${projectId}`),
 
-  createFolder: (projectId: number, name: string, description?: string) =>
-    request<StorageFolder>('POST', `/api/storage/project/${projectId}`, { name, description }),
+  createFolder: (projectId: number, name: string, roleIds: number[] = []) =>
+    request<StorageFolder>('POST', `/api/storage/project/${projectId}`, { name, roleIds }),
+
+  /** Кому видно хранилище: пустой список — всем участникам проекта */
+  setVisibility: (storageId: number, roleIds: number[]) =>
+    request<{ id: number; name: string }[]>('PUT', `/api/storage/${storageId}/visibility`, { roleIds }),
 
   updateFolder: (storageId: number, data: { name?: string; description?: string }) =>
     request<StorageFolder>('PATCH', `/api/storage/${storageId}`, data),
@@ -478,6 +486,21 @@ const storage = {
   download: (fileId: number, name: string) => download(`/api/storage/files/${fileId}/download`, name),
 };
 
+const shifts = {
+  preview: (projectId: number, body: { roadmapId: number; fromDate: string; days: number }) =>
+    request<ShiftPlan>('POST', `/api/task-shifts/projects/${projectId}/preview`, body),
+  apply: (projectId: number, body: { roadmapId: number; fromDate: string; days: number; comment?: string }) =>
+    request<ShiftRecord>('POST', `/api/task-shifts/projects/${projectId}/apply`, body),
+  history: (projectId: number) => request<ShiftRecord[]>('GET', `/api/task-shifts/projects/${projectId}`),
+  details: (shiftId: number) => request<{ shift: ShiftRecord; items: ShiftItem[] }>('GET', `/api/task-shifts/${shiftId}`),
+  undo: (shiftId: number) =>
+    request<{ id: number; restored: number; skipped: number }>('POST', `/api/task-shifts/${shiftId}/undo`),
+};
+
+const myTasks = {
+  list: () => request<MyTasksProject[]>('GET', '/api/my-tasks'),
+};
+
 export const api = {
   auth,
   projects,
@@ -490,4 +513,6 @@ export const api = {
   invitations,
   friends,
   storage,
+  myTasks,
+  shifts,
 };

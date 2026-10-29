@@ -31,7 +31,7 @@ const router = Router();
  *     responses:
  *       200: { description: "Массив разделов, у каждого поле files" }
  *   post:
- *     summary: Создать раздел — право WRITE
+ *     summary: Создать раздел — право EXECUTE (руководитель)
  *     tags: [Storage]
  *     security:
  *       - bearerAuth: []
@@ -53,16 +53,23 @@ const router = Router();
  */
 router.get('/project/:projectId', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
   try {
-    res.json(await StorageRepository.listByProject(req.params.projectId));
+    res.json(
+      await StorageRepository.listByProject(req.params.projectId, {
+        userId: req.user.id,
+        seeAll: req.userPermissions.includes('ADMIN'),
+      })
+    );
   } catch (e) {
     sendError(res, e, 'Ошибка получения хранилища');
   }
 });
 
-router.post('/project/:projectId', authMiddleware, checkProjectAccess('WRITE'), async (req, res) => {
+router.post('/project/:projectId', authMiddleware, checkProjectAccess('EXECUTE'), async (req, res) => {
   try {
-    const { name, description } = req.body;
-    res.status(201).json(await StorageRepository.createFolder(req.params.projectId, name, description));
+    const { name, description, roleIds } = req.body;
+    res.status(201).json(
+      await StorageRepository.createFolder(req.params.projectId, name, description, Array.isArray(roleIds) ? roleIds.map(Number) : [])
+    );
   } catch (e) {
     sendError(res, e, 'Ошибка создания раздела');
   }
@@ -72,7 +79,7 @@ router.post('/project/:projectId', authMiddleware, checkProjectAccess('WRITE'), 
  * @swagger
  * /api/storage/files/{fileId}:
  *   patch:
- *     summary: Переименовать файл/ссылку или изменить путь/URL — право WRITE
+ *     summary: Переименовать файл/ссылку или изменить путь/URL — право EXECUTE (руководитель)
  *     tags: [Storage]
  *     security:
  *       - bearerAuth: []
@@ -89,7 +96,7 @@ router.post('/project/:projectId', authMiddleware, checkProjectAccess('WRITE'), 
  *     responses:
  *       200: { description: Запись обновлена }
  *   delete:
- *     summary: Удалить файл/ссылку — право WRITE
+ *     summary: Удалить файл/ссылку — право EXECUTE (руководитель)
  *     tags: [Storage]
  *     security:
  *       - bearerAuth: []
@@ -113,7 +120,7 @@ const rawFile = express.raw({ type: () => true, limit: `${MAX_UPLOAD_MB}mb` });
  *       200: { description: Содержимое файла }
  * /api/storage/{storageId}/upload:
  *   post:
- *     summary: "Загрузить файл в раздел (право WRITE). Тело запроса — сам файл (Content-Type любой, до 25 МБ), имя — в заголовке X-File-Name (URL-encoded)"
+ *     summary: "Загрузить файл в раздел (право EXECUTE — руководитель). Тело запроса — сам файл (Content-Type любой, до 25 МБ), имя — в заголовке X-File-Name (URL-encoded)"
  *     tags: [Storage]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -140,7 +147,7 @@ router.get('/files/:fileId/download', authMiddleware, checkStorageFileAccess('RE
   }
 });
 
-router.post('/:storageId/upload', authMiddleware, checkStorageAccess('WRITE'), rawFile, async (req, res) => {
+router.post('/:storageId/upload', authMiddleware, checkStorageAccess('EXECUTE'), rawFile, async (req, res) => {
   let key;
   try {
     const body = requireBody(req);
@@ -153,8 +160,53 @@ router.post('/:storageId/upload', authMiddleware, checkStorageAccess('WRITE'), r
   }
 });
 
+/**
+ * @swagger
+ * /api/storage/{storageId}/visibility:
+ *   get:
+ *     summary: Роли, которым видно хранилище (пустой массив = все участники проекта). Право READ
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: storageId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "[{id, name}]" }
+ *   put:
+ *     summary: Заменить список ролей, которым видно хранилище (пустой массив = все). Право EXECUTE (руководитель)
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: storageId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleIds]
+ *             properties:
+ *               roleIds: { type: array, items: { type: integer }, example: [2, 3] }
+ *     responses:
+ *       200: { description: Итоговый список ролей }
+ */
+router.get('/:storageId/visibility', authMiddleware, checkStorageAccess('READ'), async (req, res) => {
+  try {
+    res.json(await StorageRepository.getRoles(req.params.storageId));
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения видимости хранилища');
+  }
+});
+
+router.put('/:storageId/visibility', authMiddleware, checkStorageAccess('EXECUTE'), async (req, res) => {
+  try {
+    res.json(await StorageRepository.setRoles(req.params.storageId, req.body?.roleIds));
+  } catch (e) {
+    sendError(res, e, 'Ошибка изменения видимости хранилища');
+  }
+});
+
 // Маршруты /files/... идут ДО '/:storageId', чтобы слово "files" не приняли за id раздела
-router.patch('/files/:fileId', authMiddleware, checkStorageFileAccess('WRITE'), async (req, res) => {
+router.patch('/files/:fileId', authMiddleware, checkStorageFileAccess('EXECUTE'), async (req, res) => {
   try {
     const { name, resourcePath } = req.body;
     const updated = await StorageRepository.updateFile(req.params.fileId, { name, resourcePath });
@@ -165,7 +217,7 @@ router.patch('/files/:fileId', authMiddleware, checkStorageFileAccess('WRITE'), 
   }
 });
 
-router.delete('/files/:fileId', authMiddleware, checkStorageFileAccess('WRITE'), async (req, res) => {
+router.delete('/files/:fileId', authMiddleware, checkStorageFileAccess('EXECUTE'), async (req, res) => {
   try {
     const removed = await StorageRepository.deleteFile(req.params.fileId);
     if (!removed) return res.status(404).json({ message: 'Файл не найден' });
@@ -179,7 +231,7 @@ router.delete('/files/:fileId', authMiddleware, checkStorageFileAccess('WRITE'),
  * @swagger
  * /api/storage/{storageId}:
  *   patch:
- *     summary: Переименовать раздел / изменить описание — право WRITE
+ *     summary: Переименовать раздел / изменить описание — право EXECUTE (руководитель)
  *     tags: [Storage]
  *     security:
  *       - bearerAuth: []
@@ -205,7 +257,7 @@ router.delete('/files/:fileId', authMiddleware, checkStorageFileAccess('WRITE'),
  *     responses:
  *       200: { description: Раздел удалён }
  */
-router.patch('/:storageId', authMiddleware, checkStorageAccess('WRITE'), async (req, res) => {
+router.patch('/:storageId', authMiddleware, checkStorageAccess('EXECUTE'), async (req, res) => {
   try {
     const { name, description } = req.body;
     const updated = await StorageRepository.updateFolder(req.params.storageId, { name, description });
@@ -230,7 +282,7 @@ router.delete('/:storageId', authMiddleware, checkStorageAccess('EXECUTE'), asyn
  * @swagger
  * /api/storage/{storageId}/files:
  *   post:
- *     summary: Добавить в раздел файл (FILE, путь) или внешнюю ссылку (LINK, URL) — право WRITE
+ *     summary: Добавить в раздел внешнюю ссылку (LINK, URL); файлы — через /upload — право EXECUTE (руководитель)
  *     tags: [Storage]
  *     security:
  *       - bearerAuth: []
@@ -251,7 +303,7 @@ router.delete('/:storageId', authMiddleware, checkStorageAccess('EXECUTE'), asyn
  *       201: { description: Запись добавлена }
  *       400: { description: Неверный тип ресурса или ссылка не http(s) }
  */
-router.post('/:storageId/files', authMiddleware, checkStorageAccess('WRITE'), async (req, res) => {
+router.post('/:storageId/files', authMiddleware, checkStorageAccess('EXECUTE'), async (req, res) => {
   try {
     const { resourceType, name, resourcePath } = req.body;
     const file = await StorageRepository.addFile(
