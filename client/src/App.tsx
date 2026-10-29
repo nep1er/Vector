@@ -6,6 +6,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import ProfilePage from './pages/ProfilePage';
 import TasksPage from './pages/TasksPage';
 import NotificationsPage from './pages/NotificationsPage';
+import TodoPage from './pages/TodoPage';
 import ProjectPage from './pages/ProjectPage';
 
 /** Пускает дальше только авторизованных, остальных отправляет на вход. */
@@ -34,6 +35,7 @@ export default function App() {
         {/* Внутри проекта глобальное меню скрыто: у проекта свой изолированный экран */}
         <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="projects/:projectId/roadmap/:roadmapId" element={<ProjectPage />} />
+        <Route path="projects/:projectId/todo/:todoId" element={<TodoPage />} />
 
         <Route element={<Layout />}>
           <Route index element={<ProjectsPage />} />

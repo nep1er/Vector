@@ -199,7 +199,7 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
                     ev.stopPropagation();
                     onSelect(task.id);
                   }}
-                  onDoubleClick={() => isRoadmap && onOpen(task)}
+                  onDoubleClick={() => onOpen(task)}
                 >
                   <span className="clip-title">
                     <Icon name={isRoadmap ? 'roadmap' : 'tasks'} size={14} />

@@ -7,6 +7,8 @@
  */
 import type {
   AuthResponse,
+  CardComment,
+  CardFile,
   KanbanColumn,
   Project,
   ProjectDetails,
@@ -237,51 +239,74 @@ const tasks = {
 // KANBAN  /api/kanban
 // ---------------------------------------------------------------------------
 const kanban = {
-  getBoard: (todoTaskId: number) =>
-    request<KanbanColumn[]>('GET', `/api/kanban/todo/${todoTaskId}/board`),
+  getBoard: (todoTaskId: number) => request<KanbanColumn[]>('GET', `/api/kanban/todo/${todoTaskId}/board`),
 
   createColumn: (todoTaskId: number, title: string, position?: number) =>
-    request<unknown>('POST', '/api/kanban/columns', { todoTaskId, title, position }),
+    request<{ id: number }>('POST', '/api/kanban/columns', { todoTaskId, title, position }),
 
+  /** title — переименование, position (с 1) — новое место колонки */
   updateColumn: (columnId: number, data: { title?: string; position?: number }) =>
     request<unknown>('PATCH', `/api/kanban/columns/${columnId}`, data),
 
-  deleteColumn: (columnId: number) =>
-    request<{ message: string }>('DELETE', `/api/kanban/columns/${columnId}`),
+  /** Если в колонке есть карточки: moveTo — перенести их в другую колонку, withCards — удалить вместе с ними */
+  deleteColumn: (columnId: number, opts: { moveTo?: number; withCards?: boolean } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.moveTo != null) q.set('moveTo', String(opts.moveTo));
+    if (opts.withCards) q.set('withCards', 'true');
+    const qs = q.toString();
+    return request<unknown>('DELETE', `/api/kanban/columns/${columnId}${qs ? `?${qs}` : ''}`);
+  },
 
   createCard: (data: {
     columnId: number;
     title: string;
     description?: string;
-    cardStatusId?: number;
-    position?: number;
-  }) => request<unknown>('POST', '/api/kanban/cards', data),
+    workDate?: string | null;
+    tagIds?: number[];
+    participantIds?: number[];
+  }) => request<{ id: number }>('POST', '/api/kanban/cards', data),
 
-  moveCard: (cardId: number, targetColumnId: number, newStatusId: number) =>
-    request<unknown>('PATCH', `/api/kanban/cards/${cardId}/move`, { targetColumnId, newStatusId }),
+  /** index — место в колонке (с 0) */
+  moveCard: (cardId: number, targetColumnId: number, index?: number) =>
+    request<unknown>('PATCH', `/api/kanban/cards/${cardId}/move`, { targetColumnId, index }),
 
   updateCardDetails: (
     cardId: number,
-    data: { title?: string; description?: string; workDate?: string },
+    data: { title?: string; description?: string | null; workDate?: string | null },
   ) => request<unknown>('PATCH', `/api/kanban/cards/${cardId}/details`, data),
 
   updateCardStatus: (cardId: number, cardStatusId: number) =>
     request<unknown>('PATCH', `/api/kanban/cards/${cardId}/status`, { cardStatusId }),
 
-  deleteCard: (cardId: number) =>
-    request<{ message: string }>('DELETE', `/api/kanban/cards/${cardId}`),
+  deleteCard: (cardId: number) => request<{ message: string }>('DELETE', `/api/kanban/cards/${cardId}`),
+
+  cardFiles: (cardId: number) => request<CardFile[]>('GET', `/api/kanban/cards/${cardId}/files`),
 
   addCardFile: (cardId: number, filePath: string) =>
-    request<unknown>('POST', `/api/kanban/cards/${cardId}/files`, { filePath }),
+    request<CardFile>('POST', `/api/kanban/cards/${cardId}/files`, { filePath }),
 
-  deleteFile: (fileId: number) =>
-    request<{ message: string }>('DELETE', `/api/kanban/files/${fileId}`),
+  deleteFile: (fileId: number) => request<{ message: string }>('DELETE', `/api/kanban/files/${fileId}`),
 
   addCardParticipant: (cardId: number, projectParticipantId: number) =>
     request<unknown>('POST', `/api/kanban/cards/${cardId}/participants`, { projectParticipantId }),
 
   removeCardParticipant: (cardId: number, projectParticipantId: number) =>
     request<unknown>('DELETE', `/api/kanban/cards/${cardId}/participants`, { projectParticipantId }),
+
+  addCardTag: (cardId: number, tagId: number) => request<unknown>('POST', `/api/kanban/cards/${cardId}/tags/${tagId}`),
+
+  removeCardTag: (cardId: number, tagId: number) =>
+    request<unknown>('DELETE', `/api/kanban/cards/${cardId}/tags/${tagId}`),
+
+  comments: (cardId: number) => request<CardComment[]>('GET', `/api/kanban/cards/${cardId}/comments`),
+
+  addComment: (cardId: number, content: string) =>
+    request<CardComment>('POST', `/api/kanban/cards/${cardId}/comments`, { content }),
+
+  updateComment: (commentId: number, content: string) =>
+    request<CardComment>('PATCH', `/api/kanban/comments/${commentId}`, { content }),
+
+  deleteComment: (commentId: number) => request<unknown>('DELETE', `/api/kanban/comments/${commentId}`),
 };
 
 // ---------------------------------------------------------------------------

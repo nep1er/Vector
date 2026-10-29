@@ -112,7 +112,8 @@ export default function ProjectPage() {
     );
   }
 
-  const openRoadmap = (task: TaskNode) => navigate(`/projects/${pid}/roadmap/${task.id}`);
+  const openRoadmap = (task: TaskNode) =>
+    navigate(task.type === 'TODO' ? `/projects/${pid}/todo/${task.id}` : `/projects/${pid}/roadmap/${task.id}`);
   const visible = filterTasks(current.children);
   const selected = current.children.find((t) => t.id === selectedId) ?? null;
   const isRoot = current.id === root.id;

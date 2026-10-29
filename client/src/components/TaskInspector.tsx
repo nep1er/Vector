@@ -298,11 +298,11 @@ export default function TaskInspector({ task, canEdit, projectTags, projectRoles
         )}
       </form>
 
-      {isRoadmap && (
-        <button className="btn btn-secondary btn-block inspector-gap" onClick={() => onOpen(task)}>
-          Открыть RoadMap{task.children.length > 0 ? ` (${task.children.length})` : ''}
-        </button>
-      )}
+      <button className="btn btn-secondary btn-block inspector-gap" onClick={() => onOpen(task)}>
+        {isRoadmap
+          ? `Открыть RoadMap${task.children.length > 0 ? ` (${task.children.length})` : ''}`
+          : 'Открыть доску'}
+      </button>
 
       {canEdit &&
         (confirmDelete ? (

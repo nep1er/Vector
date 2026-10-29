@@ -1,381 +1,239 @@
 import { Router } from 'express';
 import { KanbanRepository } from '../db/KanbanRepository.js';
 import { CommentRepository } from '../db/CommentRepository.js';
+import { FileRepository } from '../db/FileRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
-import { checkCardAccess, checkCommentAccess } from '../middleware/rbacMiddleware.js';
+import {
+  checkCardAccess,
+  checkColumnAccess,
+  checkCommentAccess,
+  checkTaskAccess,
+} from '../middleware/rbacMiddleware.js';
+import { pool } from '../config/db.js';
 import { sendError } from '../utils/httpError.js';
 
 const router = Router();
 
-/**
- * @swagger
- * tags:
- *   name: Kanban
- *   description: Оперативная работа с карточками и колонками Канбана
+/*
+ * Права: просмотр доски и карточек — READ; любые изменения (колонки, карточки, перемещение,
+ * исполнители, теги, файлы, комментарии) — WRITE. Если ToDo-задача скрыта от ролей
+ * пользователя (видимость задачи), её доска для него недоступна (404), кроме ADMIN.
  */
+
+const wrap = (message, handler) => async (req, res) => {
+  try {
+    await handler(req, res);
+  } catch (e) {
+    sendError(res, e, message);
+  }
+};
 
 /**
  * @swagger
- * /api/kanban/todo/{todoTaskId}/board:
+ * /api/kanban/todo/{taskId}/board:
  *   get:
- *     summary: Получить Канбан-доску с колонками и карточками для ToDo задачи
+ *     summary: Доска ToDo-задачи — колонки по порядку, в каждой карточки по порядку (с тегами, исполнителями, счётчиками)
  *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: todoTaskId
- *         required: true
- *         schema:
- *           type: integer
+ *       - { in: path, name: taskId, required: true, schema: { type: integer } }
  *     responses:
- *       200:
- *         description: Данные доски
+ *       200: { description: "[{column_id, column_title, position, cards:[{id,title,description,status_id,work_date,position,tags,participants,comments_count,files_count}]}]" }
  */
-router.get('/todo/:todoTaskId/board', authMiddleware, async (req, res) => {
-  try {
-    const board = await KanbanRepository.getBoardByTodoId(req.params.todoTaskId);
-    res.json(board);
-  } catch (error) {
-    res.status(500).json({ message: 'Ошибка загрузки канбан-доски' });
-  }
-});
-
-/**
- * @swagger
- * /api/kanban/cards/{cardId}/move:
- *   patch:
- *     summary: Переместить карточку между колонками (Drag-and-Drop)
- *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: cardId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - targetColumnId
- *               - newStatusId
- *             properties:
- *               targetColumnId:
- *                 type: integer
- *                 example: 2
- *               newStatusId:
- *                 type: integer
- *                 example: 1
- *     responses:
- *       200:
- *         description: Карточка успешно перемещена
- */
-router.patch('/cards/:cardId/move', authMiddleware, async (req, res) => {
-  try {
-    const { cardId } = req.params;
-    const { targetColumnId, newStatusId } = req.body;
-    const updatedCard = await KanbanRepository.moveCard(cardId, targetColumnId, newStatusId);
-    res.json(updatedCard);
-  } catch (error) {
-    res.status(500).json({ message: 'Ошибка перемещения карточки' });
-  }
-});
-
-import { FileRepository } from '../db/FileRepository.js';
-
-/**
- * @swagger
- * /api/kanban/cards/{cardId}:
- *   delete:
- *     summary: Удалить карточку Канбана
- *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: cardId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Карточка удалена
- */
-router.delete('/cards/:cardId', authMiddleware, async (req, res) => {
-  try {
-    const deleted = await KanbanRepository.deleteCard(req.params.cardId);
-    if (!deleted) return res.status(404).json({ message: 'Карточка не найдена' });
-    res.json({ message: 'Карточка успешно удалена', id: req.params.cardId });
-  } catch (error) {
-    res.status(500).json({ message: 'Ошибка удаления карточки' });
-  }
-});
-
-/**
- * @swagger
- * /api/kanban/columns/{columnId}:
- *   delete:
- *     summary: Удалить колонку Канбана вместе с ее карточками
- *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: columnId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Колонка удалена
- */
-router.delete('/columns/:columnId', authMiddleware, async (req, res) => {
-  try {
-    const deleted = await KanbanRepository.deleteColumn(req.params.columnId);
-    if (!deleted) return res.status(404).json({ message: 'Колонка не найдена' });
-    res.json({ message: 'Колонка успешно удалена', id: req.params.columnId });
-  } catch (error) {
-    res.status(500).json({ message: 'Ошибка удаления колонки' });
-  }
-});
-
-/**
- * @swagger
- * /api/kanban/files/{fileId}:
- *   delete:
- *     summary: Открепить/удалить файл от карточки
- *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: fileId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Файл удален
- */
-router.delete('/files/:fileId', authMiddleware, async (req, res) => {
-  try {
-    const deleted = await FileRepository.deleteFile(req.params.fileId);
-    if (!deleted) return res.status(404).json({ message: 'Файл не найден' });
-    res.json({ message: 'Файл успешно удален', id: req.params.fileId });
-  } catch (error) {
-    res.status(500).json({ message: 'Ошибка удаления файла' });
-  }
-});
+router.get(
+  '/todo/:taskId/board',
+  authMiddleware,
+  checkTaskAccess('READ'),
+  wrap('Ошибка загрузки канбан-доски', async (req, res, next) => {
+    const t = await pool.query(`SELECT type FROM task WHERE id = $1;`, [req.params.taskId]);
+    if (t.rows[0]?.type !== 'TODO') return res.status(400).json({ message: 'Это не ToDo-задача — у неё нет доски' });
+    res.json(await KanbanRepository.getBoardByTodoId(req.params.taskId));
+  })
+);
 
 /**
  * @swagger
  * /api/kanban/columns:
  *   post:
- *     summary: Создать новую колонку в Канбан-доске ToDo задачи
+ *     summary: Создать колонку (без position — в конец; position с 1 — вставка на это место). Право WRITE
  *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - todoTaskId
- *               - title
+ *             required: [todoTaskId, title]
  *             properties:
- *               todoTaskId:
- *                 type: integer
- *                 example: 2
- *               title:
- *                 type: string
- *                 example: На проверке QA
- *               position:
- *                 type: integer
- *                 example: 3
+ *               todoTaskId: { type: integer }
+ *               title: { type: string, example: На проверке }
+ *               position: { type: integer, example: 2 }
  *     responses:
- *       201:
- *         description: Колонка создана
+ *       201: { description: Колонка создана }
  */
-router.post('/columns', authMiddleware, async (req, res) => {
-  try {
-    const { todoTaskId, title, position } = req.body;
-    const col = await KanbanRepository.createColumn(todoTaskId, title, position || 0);
-    res.status(201).json(col);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка создания колонки' });
-  }
-});
-
-/**
- * @swagger
- * /api/kanban/cards:
- *   post:
- *     summary: Создать новую карточку в колонке
- *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - columnId
- *               - title
- *             properties:
- *               columnId:
- *                 type: integer
- *                 example: 1
- *               title:
- *                 type: string
- *                 example: Написать тесты контроллеров
- *               description:
- *                 type: string
- *                 example: Покрыть unit-тестами роуты Auth и Projects
- *     responses:
- *       201:
- *         description: Карточка создана
- */
-router.post('/cards', authMiddleware, async (req, res) => {
-  try {
-    const { columnId, title, description, cardStatusId, position } = req.body;
-    const card = await KanbanRepository.createCard(columnId, title, description, cardStatusId, position);
-    res.status(201).json(card);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка создания карточки' });
-  }
-});
-
-/**
- * @swagger
- * /api/kanban/cards/{cardId}/files:
- *   post:
- *     summary: Прикрепить файл (ссылку/путь) к карточке
- *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: cardId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - filePath
- *             properties:
- *               filePath:
- *                 type: string
- *                 example: /uploads/specs/architecture.pdf
- *     responses:
- *       201:
- *         description: Файл успешно прикреплен к карточке
- */
-router.post('/cards/:cardId/files', authMiddleware, async (req, res) => {
-  try {
-    const { filePath } = req.body;
-    const file = await FileRepository.addFileToCard(req.params.cardId, filePath);
-    res.status(201).json(file);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка прикрепления файла' });
-  }
-});
+router.post(
+  '/columns',
+  authMiddleware,
+  checkTaskAccess('WRITE', (req) => req.body?.todoTaskId),
+  wrap('Ошибка создания колонки', async (req, res) => {
+    const t = await pool.query(`SELECT type FROM task WHERE id = $1;`, [req.body.todoTaskId]);
+    if (t.rows[0]?.type !== 'TODO') return res.status(400).json({ message: 'Это не ToDo-задача — у неё нет доски' });
+    res.status(201).json(await KanbanRepository.createColumn(req.body.todoTaskId, req.body.title, req.body.position));
+  })
+);
 
 /**
  * @swagger
  * /api/kanban/columns/{columnId}:
  *   patch:
- *     summary: Изменить название и/или позицию колонки Канбана
+ *     summary: Переименовать и/или переместить колонку (position — новое место с 1). Право WRITE
  *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: columnId
- *         required: true
- *         schema: { type: integer }
+ *       - { in: path, name: columnId, required: true, schema: { type: integer } }
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               title: { type: string, example: "На проверке (Review)" }
- *               position: { type: integer, example: 3 }
+ *               title: { type: string }
+ *               position: { type: integer }
  *     responses:
  *       200: { description: Колонка обновлена }
+ *   delete:
+ *     summary: "Удалить колонку. Если в ней есть карточки: ?moveTo=<id колонки> переносит их, ?withCards=true удаляет вместе с ними, иначе 409. Право WRITE"
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: columnId, required: true, schema: { type: integer } }
+ *       - { in: query, name: moveTo, schema: { type: integer } }
+ *       - { in: query, name: withCards, schema: { type: boolean } }
+ *     responses:
+ *       200: { description: Колонка удалена }
+ *       409: { description: В колонке есть карточки }
  */
-router.patch('/columns/:columnId', authMiddleware, async (req, res) => {
-  try {
-    const { title, position } = req.body;
-    const updated = await KanbanRepository.updateColumnDetails(req.params.columnId, title, position);
-    res.json(updated);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления колонки' });
-  }
-});
+router.patch(
+  '/columns/:columnId',
+  authMiddleware,
+  checkColumnAccess('WRITE'),
+  wrap('Ошибка обновления колонки', async (req, res) => {
+    res.json(await KanbanRepository.updateColumn(req.params.columnId, req.body ?? {}));
+  })
+);
+
+router.delete(
+  '/columns/:columnId',
+  authMiddleware,
+  checkColumnAccess('WRITE'),
+  wrap('Ошибка удаления колонки', async (req, res) => {
+    const moveTo = req.query.moveTo != null ? Number(req.query.moveTo) : null;
+    if (moveTo !== null && !Number.isInteger(moveTo)) return res.status(400).json({ message: 'Некорректный moveTo' });
+    res.json(
+      await KanbanRepository.deleteColumn(req.params.columnId, { moveToColumnId: moveTo, withCards: req.query.withCards === 'true' })
+    );
+  })
+);
+
+/**
+ * @swagger
+ * /api/kanban/cards:
+ *   post:
+ *     summary: Создать карточку в конце колонки (теги и исполнители — необязательно). Право WRITE
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [columnId, title]
+ *             properties:
+ *               columnId: { type: integer }
+ *               title: { type: string }
+ *               description: { type: string }
+ *               workDate: { type: string, format: date-time }
+ *               tagIds: { type: array, items: { type: integer } }
+ *               participantIds: { type: array, items: { type: integer }, description: id из project_participants }
+ *     responses:
+ *       201: { description: Карточка создана }
+ */
+router.post(
+  '/cards',
+  authMiddleware,
+  (req, res, next) => {
+    req.params.columnId = req.body?.columnId;
+    checkColumnAccess('WRITE')(req, res, next);
+  },
+  wrap('Ошибка создания карточки', async (req, res) => {
+    const { columnId, ...rest } = req.body;
+    res.status(201).json(await KanbanRepository.createCard(columnId, rest));
+  })
+);
+
+/**
+ * @swagger
+ * /api/kanban/cards/{cardId}/move:
+ *   patch:
+ *     summary: Переместить карточку в колонку targetColumnId на место index (с 0; без index — в конец). Право WRITE
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [targetColumnId]
+ *             properties:
+ *               targetColumnId: { type: integer }
+ *               index: { type: integer }
+ *               newStatusId: { type: integer, description: необязательно }
+ *     responses:
+ *       200: { description: Карточка перемещена }
+ */
+router.patch(
+  '/cards/:cardId/move',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка перемещения карточки', async (req, res) => {
+    const { targetColumnId, index, newStatusId } = req.body ?? {};
+    if (!Number.isInteger(Number(targetColumnId))) return res.status(400).json({ message: 'Укажите targetColumnId' });
+    res.json(await KanbanRepository.moveCard(req.params.cardId, targetColumnId, index, newStatusId));
+  })
+);
 
 /**
  * @swagger
  * /api/kanban/cards/{cardId}/details:
  *   patch:
- *     summary: Изменить название, описание и/или work_date у карточки Канбана
+ *     summary: Изменить название, описание, дату (description и workDate можно очистить, передав null). Право WRITE
  *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: cardId
- *         required: true
- *         schema: { type: integer }
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               title: { type: string, example: "Новое название карточки" }
- *               description: { type: string, example: "Новое подробное описание" }
- *               workDate: { type: string, example: "2026-10-15T12:00:00Z" }
+ *               title: { type: string }
+ *               description: { type: string, nullable: true }
+ *               workDate: { type: string, format: date-time, nullable: true }
  *     responses:
- *       200: { description: Детали карточки обновлены }
- */
-router.patch('/cards/:cardId/details', authMiddleware, async (req, res) => {
-  try {
-    const { title, description, workDate } = req.body;
-    const updated = await KanbanRepository.updateCardDetails(req.params.cardId, { title, description, workDate });
-    res.json(updated);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка обновления карточки' });
-  }
-});
-
-/**
- * @swagger
+ *       200: { description: Карточка обновлена }
  * /api/kanban/cards/{cardId}/status:
  *   patch:
- *     summary: Изменить статус карточки (0 = Не выполнена, 1 = Выполнена)
+ *     summary: "Отметить карточку выполненной / невыполненной (card_status_id). Право WRITE"
  *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: cardId
- *         required: true
- *         schema: { type: integer }
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
  *     requestBody:
  *       required: true
  *       content:
@@ -386,31 +244,55 @@ router.patch('/cards/:cardId/details', authMiddleware, async (req, res) => {
  *             properties:
  *               cardStatusId: { type: integer, example: 1 }
  *     responses:
- *       200: { description: Статус карточки обновлен }
+ *       200: { description: Статус обновлён }
+ * /api/kanban/cards/{cardId}:
+ *   delete:
+ *     summary: Удалить карточку. Право WRITE
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Карточка удалена }
  */
-router.patch('/cards/:cardId/status', authMiddleware, async (req, res) => {
-  try {
-    const { cardStatusId } = req.body;
-    const updated = await KanbanRepository.updateCardStatus(req.params.cardId, cardStatusId);
-    res.json(updated);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка смены статуса карточки' });
-  }
-});
+router.patch(
+  '/cards/:cardId/details',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка обновления карточки', async (req, res) => {
+    res.json(await KanbanRepository.updateCardDetails(req.params.cardId, req.body ?? {}));
+  })
+);
+
+router.patch(
+  '/cards/:cardId/status',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка смены статуса карточки', async (req, res) => {
+    res.json(await KanbanRepository.updateCardStatus(req.params.cardId, req.body?.cardStatusId));
+  })
+);
+
+router.delete(
+  '/cards/:cardId',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка удаления карточки', async (req, res) => {
+    const deleted = await KanbanRepository.deleteCard(req.params.cardId);
+    if (!deleted) return res.status(404).json({ message: 'Карточка не найдена' });
+    res.json({ message: 'Карточка удалена', id: deleted.id });
+  })
+);
 
 /**
  * @swagger
  * /api/kanban/cards/{cardId}/participants:
  *   post:
- *     summary: Назначить участника проекта на карточку Канбана
+ *     summary: Назначить исполнителя карточки (projectParticipantId из GET /participants → participant_id). Право WRITE
  *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: cardId
- *         required: true
- *         schema: { type: integer }
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
  *     requestBody:
  *       required: true
  *       content:
@@ -419,19 +301,15 @@ router.patch('/cards/:cardId/status', authMiddleware, async (req, res) => {
  *             type: object
  *             required: [projectParticipantId]
  *             properties:
- *               projectParticipantId: { type: integer, example: 1 }
+ *               projectParticipantId: { type: integer }
  *     responses:
- *       201: { description: Участник назначен на карточку }
+ *       201: { description: Исполнитель назначен }
  *   delete:
- *     summary: Снять участника с карточки Канбана
+ *     summary: Снять исполнителя с карточки. Право WRITE
  *     tags: [Kanban]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: cardId
- *         required: true
- *         schema: { type: integer }
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
  *     requestBody:
  *       required: true
  *       content:
@@ -440,29 +318,143 @@ router.patch('/cards/:cardId/status', authMiddleware, async (req, res) => {
  *             type: object
  *             required: [projectParticipantId]
  *             properties:
- *               projectParticipantId: { type: integer, example: 1 }
+ *               projectParticipantId: { type: integer }
  *     responses:
- *       200: { description: Участник снят с карточки }
+ *       200: { description: Исполнитель снят }
+ * /api/kanban/cards/{cardId}/tags/{tagId}:
+ *   post:
+ *     summary: Повесить тег Канбана на карточку (тег должен быть из того же проекта). Право WRITE
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *       - { in: path, name: tagId, required: true, schema: { type: integer } }
+ *     responses:
+ *       201: { description: Тег добавлен }
+ *   delete:
+ *     summary: Снять тег с карточки. Право WRITE
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *       - { in: path, name: tagId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Тег снят }
  */
-router.post('/cards/:cardId/participants', authMiddleware, async (req, res) => {
-  try {
-    const { projectParticipantId } = req.body;
-    const added = await KanbanRepository.addCardParticipant(req.params.cardId, projectParticipantId);
-    res.status(201).json(added);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка добавления участника карточки' });
-  }
-});
+router.post(
+  '/cards/:cardId/participants',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка добавления исполнителя', async (req, res) => {
+    res.status(201).json(await KanbanRepository.addCardParticipant(req.params.cardId, req.body?.projectParticipantId));
+  })
+);
 
-router.delete('/cards/:cardId/participants', authMiddleware, async (req, res) => {
-  try {
-    const { projectParticipantId } = req.body;
-    const removed = await KanbanRepository.removeCardParticipant(req.params.cardId, projectParticipantId);
-    res.json(removed);
-  } catch (e) {
-    res.status(500).json({ message: 'Ошибка удаления участника с карточки' });
-  }
-});
+router.delete(
+  '/cards/:cardId/participants',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка снятия исполнителя', async (req, res) => {
+    await KanbanRepository.removeCardParticipant(req.params.cardId, req.body?.projectParticipantId);
+    res.json({ message: 'Исполнитель снят' });
+  })
+);
+
+router.post(
+  '/cards/:cardId/tags/:tagId',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка добавления тега', async (req, res) => {
+    res.status(201).json(await KanbanRepository.applyTag(req.params.cardId, req.params.tagId));
+  })
+);
+
+router.delete(
+  '/cards/:cardId/tags/:tagId',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка снятия тега', async (req, res) => {
+    await KanbanRepository.removeTag(req.params.cardId, req.params.tagId);
+    res.json({ message: 'Тег снят' });
+  })
+);
+
+/**
+ * @swagger
+ * /api/kanban/cards/{cardId}/files:
+ *   get:
+ *     summary: Файлы карточки. Право READ
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Список файлов }
+ *   post:
+ *     summary: Прикрепить файл (путь или ссылку) к карточке. Право WRITE
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: cardId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [filePath]
+ *             properties:
+ *               filePath: { type: string }
+ *     responses:
+ *       201: { description: Файл добавлен }
+ * /api/kanban/files/{fileId}:
+ *   delete:
+ *     summary: Удалить файл карточки. Право WRITE
+ *     tags: [Kanban]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: fileId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Файл удалён }
+ */
+router.get(
+  '/cards/:cardId/files',
+  authMiddleware,
+  checkCardAccess('READ'),
+  wrap('Ошибка получения файлов', async (req, res) => {
+    res.json(await FileRepository.getCardFiles(req.params.cardId));
+  })
+);
+
+router.post(
+  '/cards/:cardId/files',
+  authMiddleware,
+  checkCardAccess('WRITE'),
+  wrap('Ошибка добавления файла', async (req, res) => {
+    const path = String(req.body?.filePath ?? '').trim();
+    if (!path) return res.status(400).json({ message: 'Укажите путь или ссылку на файл' });
+    if (path.length > 512) return res.status(400).json({ message: 'Путь — не длиннее 512 символов' });
+    res.status(201).json(await FileRepository.addFileToCard(req.params.cardId, path));
+  })
+);
+
+router.delete(
+  '/files/:fileId',
+  authMiddleware,
+  wrap('Ошибка удаления файла', async (req, res, next) => {
+    const f = await pool.query('SELECT kanban_card_id FROM kanban_card_files WHERE id = $1;', [req.params.fileId]);
+    if (f.rows.length === 0) return res.status(404).json({ message: 'Файл не найден' });
+    req.params.cardId = f.rows[0].kanban_card_id;
+    checkCardAccess('WRITE')(req, res, async () => {
+      try {
+        await FileRepository.deleteFile(req.params.fileId);
+        res.json({ message: 'Файл удалён' });
+      } catch (e) {
+        sendError(res, e, 'Ошибка удаления файла');
+      }
+    });
+  })
+);
 
 // ---------------------------------------------------------------------------
 // КОММЕНТАРИИ К КАРТОЧКАМ (card_comments)

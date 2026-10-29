@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import { KanbanRepository } from '../db/KanbanRepository.js';
 import { KanbanTagRepository } from '../db/KanbanTagRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { checkCardAccess, checkKanbanTagAccess, checkProjectAccess } from '../middleware/rbacMiddleware.js';
 import { sendError } from '../utils/httpError.js';
 
 const router = Router();
@@ -65,7 +67,7 @@ const router = Router();
  *       409:
  *         description: Тег с таким названием уже есть в проекте
  */
-router.get('/project/:projectId', authMiddleware, async (req, res) => {
+router.get('/project/:projectId', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
   try {
     const tags = await KanbanTagRepository.getProjectTags(req.params.projectId);
     res.json(tags);
@@ -74,7 +76,7 @@ router.get('/project/:projectId', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/project/:projectId', authMiddleware, async (req, res) => {
+router.post('/project/:projectId', authMiddleware, checkProjectAccess('WRITE'), async (req, res) => {
   try {
     const { name, color } = req.body;
     if (!name || !String(name).trim()) {
@@ -121,10 +123,15 @@ router.post('/project/:projectId', authMiddleware, async (req, res) => {
  *       500:
  *         description: Ошибка при добавлении тега
  */
-router.post('/apply', authMiddleware, async (req, res) => {
+const cardFromBody = (req, res, next) => {
+  req.params.cardId = req.body?.cardId;
+  checkCardAccess('WRITE')(req, res, next);
+};
+
+router.post('/apply', authMiddleware, cardFromBody, async (req, res) => {
   try {
     const { cardId, tagId } = req.body;
-    const applied = await KanbanTagRepository.applyTagToCard(cardId, tagId);
+    const applied = await KanbanRepository.applyTag(cardId, tagId);
     res.status(201).json(applied ?? { message: 'Тег уже привязан к карточке' });
   } catch (e) {
     sendError(res, e, 'Ошибка добавления тега к карточке');
@@ -159,7 +166,7 @@ router.post('/apply', authMiddleware, async (req, res) => {
  */
 // ВАЖНО: этот маршрут должен идти ДО '/:tagId', иначе Express примет
 // слово "remove-from-card" за id тега и вернёт ошибку.
-router.delete('/remove-from-card', authMiddleware, async (req, res) => {
+router.delete('/remove-from-card', authMiddleware, cardFromBody, async (req, res) => {
   try {
     const { cardId, tagId } = req.body;
     const removed = await KanbanTagRepository.removeTagFromCard(cardId, tagId);
@@ -187,7 +194,7 @@ router.delete('/remove-from-card', authMiddleware, async (req, res) => {
  *       200:
  *         description: Тег полностью удален из проекта
  */
-router.delete('/:tagId', authMiddleware, async (req, res) => {
+router.delete('/:tagId', authMiddleware, checkKanbanTagAccess('WRITE'), async (req, res) => {
   try {
     const deleted = await KanbanTagRepository.deleteTag(req.params.tagId);
     if (!deleted) return res.status(404).json({ message: 'Тег не найден' });
@@ -221,7 +228,7 @@ router.delete('/:tagId', authMiddleware, async (req, res) => {
  *     responses:
  *       200: { description: Тег обновлен }
  */
-router.patch('/:tagId/details', authMiddleware, async (req, res) => {
+router.patch('/:tagId/details', authMiddleware, checkKanbanTagAccess('WRITE'), async (req, res) => {
   try {
     const { name, colorCode } = req.body;
     const updated = await KanbanTagRepository.updateTagDetails(req.params.tagId, { name, colorCode });

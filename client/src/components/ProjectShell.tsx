@@ -21,7 +21,9 @@ interface Props {
   canSettings: boolean;
   canManage: boolean;
   /** Кнопка «Фильтры» с выпадающим меню */
-  filterSlot: ReactNode;
+  filterSlot?: ReactNode;
+  /** Подпись кнопки «+» (по умолчанию «Добавить задачу») */
+  addLabel?: string;
   onParticipants: () => void;
   onAddMember: () => void;
   onAddTask: () => void;
@@ -73,7 +75,12 @@ export default function ProjectShell(p: Props) {
         <div className="rail-section rail-bottom">
           {p.filterSlot}
           {p.canAddTask && (
-            <button className="rail-btn" title="Добавить задачу" aria-label="Добавить задачу" onClick={p.onAddTask}>
+            <button
+              className="rail-btn"
+              title={p.addLabel ?? 'Добавить задачу'}
+              aria-label={p.addLabel ?? 'Добавить задачу'}
+              onClick={p.onAddTask}
+            >
               <Icon name="plus" />
             </button>
           )}

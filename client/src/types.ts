@@ -52,19 +52,58 @@ export interface TaskNode extends Task {
   children: TaskNode[];
 }
 
+export interface KanbanCardTag {
+  id: number;
+  name: string;
+  color_code: string;
+}
+
+export interface KanbanCardPerson {
+  participant_id: number;
+  user_id: number;
+  username: string;
+  avatar_url: string | null;
+}
+
 export interface KanbanCard {
   id: number;
+  kanban_column_id: number;
   title: string;
   description: string | null;
-  status_id: number; // 0 = не выполнена, 1 = выполнена
+  /** 0 = не выполнена, 1 = выполнена */
+  status_id: number;
+  work_date: string | null;
+  position: number;
   created_at: string;
+  tags: KanbanCardTag[];
+  participants: KanbanCardPerson[];
+  comments_count: number;
+  files_count: number;
 }
 
 export interface KanbanColumn {
   column_id: number;
   column_title: string;
   position: number;
-  cards: KanbanCard[] | null;
+  cards: KanbanCard[];
+}
+
+export interface CardComment {
+  id: number;
+  kanban_card_id: number;
+  content: string;
+  created_at: string;
+  updated_at: string | null;
+  author_id: number | null;
+  author_name: string | null;
+  author_avatar_url: string | null;
+}
+
+export interface CardFile {
+  id: number;
+  kanban_card_id: number;
+  file_path: string;
+  uploaded_at: string;
 }
 
 export interface ProjectRole {

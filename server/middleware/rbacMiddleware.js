@@ -40,9 +40,9 @@ export const checkProjectAccess = (requiredPermission) => (req, res, next) =>
   authorize(req, res, next, req.params.projectId ?? req.body?.projectId, requiredPermission);
 
 /** Для маршрутов вида /tasks/:taskId/... — проект определяется по задаче */
-export const checkTaskAccess = (requiredPermission) => async (req, res, next) => {
+export const checkTaskAccess = (requiredPermission, idFrom = (req) => req.params.taskId) => async (req, res, next) => {
   try {
-    const taskId = Number(req.params.taskId);
+    const taskId = Number(idFrom(req));
     if (!Number.isInteger(taskId)) {
       return res.status(400).json({ message: 'Некорректный ID задачи' });
     }
@@ -109,12 +109,56 @@ const CARD_PROJECT_JOIN = `
   JOIN kanban_column col ON col.id = c.kanban_column_id
   JOIN task t ON t.id = col.todo_task_id`;
 
+/**
+ * Как accessByParam, но SQL возвращает ещё и task_id (ToDo-задача): если ToDo скрыта
+ * от ролей пользователя, объекты на её доске для него «не существуют» (кроме ADMIN).
+ */
+const accessByParamInTodo = (paramName, sql, notFoundMessage, label) => (requiredPermission) =>
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params[paramName]);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: `Некорректный ID: ${label}` });
+      const found = await pool.query(sql, [id]);
+      if (found.rows.length === 0) return res.status(404).json({ message: notFoundMessage });
+      const { project_id: projectId, task_id: taskId } = found.rows[0];
+      const afterAuth = async () => {
+        try {
+          if (!req.userPermissions.includes('ADMIN') && !(await TaskVisibilityRepository.canSee(taskId, req.user.id))) {
+            return res.status(404).json({ message: notFoundMessage });
+          }
+          next();
+        } catch (error) {
+          sendError(res, error, 'Ошибка проверки прав доступа');
+        }
+      };
+      return authorize(req, res, afterAuth, projectId, requiredPermission);
+    } catch (error) {
+      sendError(res, error, 'Ошибка проверки прав доступа');
+    }
+  };
+
 /** /kanban/cards/:cardId/... */
-export const checkCardAccess = accessByParam(
+export const checkCardAccess = accessByParamInTodo(
   'cardId',
-  `SELECT t.project_id ${CARD_PROJECT_JOIN} WHERE c.id = $1`,
+  `SELECT t.project_id, t.id AS task_id ${CARD_PROJECT_JOIN} WHERE c.id = $1`,
   'Карточка не найдена',
   'карточки'
+);
+
+/** /kanban/columns/:columnId/... */
+export const checkColumnAccess = accessByParamInTodo(
+  'columnId',
+  `SELECT t.project_id, t.id AS task_id FROM kanban_column col JOIN task t ON t.id = col.todo_task_id WHERE col.id = $1`,
+  'Колонка не найдена',
+  'колонки'
+);
+
+/** /kanban-tags/:tagId */
+export const checkKanbanTagAccess = accessByParam(
+  'tagId',
+  'SELECT project_id FROM kanban_tag WHERE id = $1',
+  'Тег не найден',
+  'тега'
 );
 
 /** /kanban/comments/:commentId */
