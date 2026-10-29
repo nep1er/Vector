@@ -281,7 +281,7 @@ router.get('/:projectId/participants', authMiddleware, checkProjectAccess('READ'
  * @swagger
  * /api/projects/{projectId}/participants/{userId}/role:
  *   patch:
- *     summary: Сменить роль участника — делает выбранную роль единственной (право ADMIN)
+ *     summary: Сменить роль участника — заменяет ВСЕ его роли одной выбранной (право ADMIN). Для нескольких ролей используйте POST/DELETE .../roles
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -410,6 +410,79 @@ router.delete(
       res.json({ message: 'Приглашение отозвано', id: cancelled.id });
     } catch (e) {
       sendError(res, e, 'Ошибка отзыва приглашения');
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/projects/{projectId}/participants/{userId}/roles:
+ *   post:
+ *     summary: Добавить участнику ещё одну роль (ролей может быть несколько, права объединяются) — право ADMIN
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *       - { in: path, name: userId, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleId]
+ *             properties:
+ *               roleId: { type: integer, example: 3 }
+ *     responses:
+ *       201: { description: "Итоговый список ролей участника [{id, name}]" }
+ *       404: { description: Участник или роль не найдены }
+ * /api/projects/{projectId}/participants/{userId}/roles/{roleId}:
+ *   delete:
+ *     summary: Снять роль с участника (должна остаться хотя бы одна роль, а в проекте — администратор) — право ADMIN
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *       - { in: path, name: userId, required: true, schema: { type: integer } }
+ *       - { in: path, name: roleId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "Итоговый список ролей участника" }
+ *       400: { description: Нельзя снять последнюю роль или единственного администратора }
+ */
+router.post(
+  '/:projectId/participants/:userId/roles',
+  authMiddleware,
+  checkProjectAccess('ADMIN'),
+  async (req, res) => {
+    try {
+      const projectId = Number(req.params.projectId);
+      const roleId = Number(req.body.roleId);
+      if (!Number.isInteger(roleId)) return res.status(400).json({ message: 'Укажите roleId' });
+      const participantId = await RoleRepository.participantIdByUser(projectId, Number(req.params.userId));
+      if (!participantId) return res.status(404).json({ message: 'Участник не найден в проекте' });
+      res.status(201).json(await RoleRepository.addRoleToParticipant(projectId, participantId, roleId));
+    } catch (e) {
+      sendError(res, e, 'Ошибка добавления роли участнику');
+    }
+  }
+);
+
+router.delete(
+  '/:projectId/participants/:userId/roles/:roleId',
+  authMiddleware,
+  checkProjectAccess('ADMIN'),
+  async (req, res) => {
+    try {
+      const projectId = Number(req.params.projectId);
+      const roleId = Number(req.params.roleId);
+      if (!Number.isInteger(roleId)) return res.status(400).json({ message: 'Некорректный ID роли' });
+      const participantId = await RoleRepository.participantIdByUser(projectId, Number(req.params.userId));
+      if (!participantId) return res.status(404).json({ message: 'Участник не найден в проекте' });
+      res.json(await RoleRepository.removeRoleFromParticipant(projectId, participantId, roleId));
+    } catch (e) {
+      sendError(res, e, 'Ошибка снятия роли с участника');
     }
   }
 );

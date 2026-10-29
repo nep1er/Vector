@@ -9,8 +9,15 @@
       // Применяем тему до отрисовки, чтобы страница не мигала
       try {
         var t = localStorage.getItem('vector_theme');
-        var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        var v3 = localStorage.getItem('vector_theme_v') === '3';
+        var map = { 'system-light': 'light', 'system-dark': 'dark', light: 'plain-light', dark: 'plain-dark' };
+        var attr;
+        if (t === 'system-light' || t === 'system-dark') attr = map[t];
+        else if ((t === 'light' || t === 'dark') && v3) attr = map[t];
+        else if (t === 'light') attr = 'light';
+        else if (t === 'dark') attr = 'dark';
+        else attr = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', attr);
       } catch (e) {}
     </script>
   </head>

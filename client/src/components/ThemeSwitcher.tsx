@@ -1,6 +1,6 @@
 import { THEME_OPTIONS, useTheme } from '../theme/ThemeContext';
 
-/** Переключатель темы: Системная / Светлая / Тёмная. */
+/** Переключатель темы: четыре темы (2×2). */
 export default function ThemeSwitcher() {
   const { pref, setPref } = useTheme();
   return (

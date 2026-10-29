@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TaskNode } from '../types';
 import { dayIndex, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
-import { statusById } from '../utils/status';
+import { statusById, textOn } from '../utils/status';
 import Icon from './Icon';
 
 const ZOOMS = [4, 7, 12, 20, 32, 48, 72]; // пикселей на день
-const LANE_H = 44;
+const LANE_H = 56;
 const LANE_GAP = 8;
 
 interface Props {
@@ -188,6 +188,9 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
                     width,
                     top: LANE_GAP + lane * (LANE_H + LANE_GAP),
                     height: LANE_H,
+                    // статус красит всю плашку целиком
+                    background: statusById(task.status_id).color,
+                    color: textOn(statusById(task.status_id).color),
                   }}
                   title={`${task.title}\n${formatDay(s)} — ${formatDay(e)}\n${statusById(task.status_id).name}${
                     task.tags.length ? `\n# ${task.tags.map((t) => t.name).join(', ')}` : ''
@@ -198,11 +201,6 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
                   }}
                   onDoubleClick={() => isRoadmap && onOpen(task)}
                 >
-                  <i
-                    className="clip-status"
-                    style={{ background: statusById(task.status_id).color }}
-                    aria-label={statusById(task.status_id).name}
-                  />
                   <span className="clip-title">
                     <Icon name={isRoadmap ? 'roadmap' : 'tasks'} size={14} />
                     {task.title}
@@ -210,6 +208,19 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
                   {width > 150 && (
                     <span className="clip-dates">
                       {formatDay(s)} — {formatDay(e)}
+                    </span>
+                  )}
+                  {task.tags.length > 0 && (
+                    <span className="clip-tags">
+                      {task.tags.map((t) => (
+                        <span
+                          key={t.id}
+                          className="clip-tag"
+                          style={{ background: t.color_code, color: textOn(t.color_code) }}
+                        >
+                          {t.name}
+                        </span>
+                      ))}
                     </span>
                   )}
                 </button>

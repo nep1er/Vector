@@ -14,6 +14,20 @@ export const TASK_STATUSES: (TaskStatus & { color: string })[] = [
   { id: 6, code: 'INACTIVE', name: 'Неактивно', color: '#8a8a8a' },
 ];
 
+/** Цвет текста (белый/тёмный) с лучшим контрастом на заливке hex-цвета */
+export function textOn(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return '#fff';
+  const n = parseInt(m[1], 16);
+  const lin = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  // контраст с белым против контраста с тёмным #141414 (L ≈ 0.007)
+  return 1.05 / (L + 0.05) >= (L + 0.05) / 0.057 ? '#fff' : '#141414';
+}
+
 export const statusById = (id: number) => TASK_STATUSES.find((s) => s.id === id) ?? TASK_STATUSES[2];
 
 export interface TaskFilters {

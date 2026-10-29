@@ -19,19 +19,22 @@ const TABS: { id: SettingsTab; label: string }[] = [
 interface Props {
   project: ProjectDetails;
   initialTab?: SettingsTab;
+  /** Право ADMIN. Без него окно только для просмотра: «Общие» и «Участники», ничего нельзя менять */
+  canManage?: boolean;
   onClose: () => void;
   /** Что-то изменилось (название, участники, роли, теги) — страница перезагружает данные */
   onSaved: () => Promise<void> | void;
 }
 
-export default function ProjectSettingsModal({ project, initialTab = 'general', onClose, onSaved }: Props) {
+export default function ProjectSettingsModal({ project, initialTab = 'general', canManage = true, onClose, onSaved }: Props) {
   const { user } = useAuth();
-  const [tab, setTab] = useState<SettingsTab>(initialTab);
+  const tabs = canManage ? TABS : TABS.filter((t) => t.id === 'general' || t.id === 'members');
+  const [tab, setTab] = useState<SettingsTab>(tabs.some((t) => t.id === initialTab) ? initialTab : 'general');
 
   return (
-    <Modal title="Настройки проекта" onClose={onClose} wide>
+    <Modal title={canManage ? 'Настройки проекта' : 'О проекте'} onClose={onClose} wide>
       <div className="tabs" role="tablist">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             role="tab"
@@ -45,12 +48,29 @@ export default function ProjectSettingsModal({ project, initialTab = 'general', 
       </div>
 
       <div className="tab-body">
-        {tab === 'general' && <GeneralTab project={project} onChanged={onSaved} />}
+        {tab === 'general' &&
+          (canManage ? (
+            <GeneralTab project={project} onChanged={onSaved} />
+          ) : (
+            <dl className="project-info">
+              <dt>Название</dt>
+              <dd>{project.title}</dd>
+              <dt>Описание</dt>
+              <dd>{project.description || '—'}</dd>
+              <dt>Создан</dt>
+              <dd>{new Date(project.created_at).toLocaleDateString('ru-RU')}</dd>
+            </dl>
+          ))}
         {tab === 'members' && (
-          <MembersTab projectId={project.id} currentUserId={user?.id ?? 0} onChanged={onSaved} />
+          <MembersTab
+            projectId={project.id}
+            currentUserId={user?.id ?? 0}
+            onChanged={onSaved}
+            readOnly={!canManage}
+          />
         )}
-        {tab === 'roles' && <RolesTab projectId={project.id} onChanged={onSaved} />}
-        {tab === 'tags' && <TagsTab projectId={project.id} onChanged={onSaved} />}
+        {canManage && tab === 'roles' && <RolesTab projectId={project.id} onChanged={onSaved} />}
+        {canManage && tab === 'tags' && <TagsTab projectId={project.id} onChanged={onSaved} />}
       </div>
 
       <div className="modal-actions">

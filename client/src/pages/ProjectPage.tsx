@@ -134,8 +134,9 @@ export default function ProjectPage() {
       participants={participants}
       canInvite={can('ADMIN')}
       canAddTask={can('WRITE') || can('EXECUTE')}
-      canSettings={can('ADMIN')}
-      onParticipants={() => (can('ADMIN') ? setSettingsTab('members') : undefined)}
+      canSettings
+      canManage={can('ADMIN')}
+      onParticipants={() => setSettingsTab('members')}
       onAddMember={() => setShowAddMember(true)}
       onAddTask={() => setShowCreate(true)}
       onSettings={() => setSettingsTab('general')}
@@ -185,6 +186,7 @@ export default function ProjectPage() {
         <ProjectSettingsModal
           project={project}
           initialTab={settingsTab}
+          canManage={can('ADMIN')}
           onClose={() => setSettingsTab(null)}
           onSaved={load}
         />

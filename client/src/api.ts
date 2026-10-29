@@ -154,6 +154,15 @@ const projects = {
     request<Participant[]>('GET', `/api/projects/${projectId}/participants`),
 
   /** Сменить роль участника (делает её единственной), право ADMIN */
+  addParticipantRole: (projectId: number, userId: number, roleId: number) =>
+    request<{ id: number; name: string }[]>('POST', `/api/projects/${projectId}/participants/${userId}/roles`, {
+      roleId,
+    }),
+  removeParticipantRole: (projectId: number, userId: number, roleId: number) =>
+    request<{ id: number; name: string }[]>(
+      'DELETE',
+      `/api/projects/${projectId}/participants/${userId}/roles/${roleId}`
+    ),
   setParticipantRole: (projectId: number, userId: number, roleId: number) =>
     request<unknown>('PATCH', `/api/projects/${projectId}/participants/${userId}/role`, { roleId }),
 

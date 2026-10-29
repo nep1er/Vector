@@ -3,16 +3,19 @@ import type { FormEvent } from 'react';
 import { api } from '../../api';
 import type { Invitation, Participant, ProjectRole } from '../../types';
 import Avatar from '../Avatar';
+import Dropdown from '../Dropdown';
 import Icon from '../Icon';
 
 interface Props {
   projectId: number;
   currentUserId: number;
   onChanged: () => Promise<void> | void;
+  /** Только просмотр (для участников без права ADMIN): без приглашений, смены ролей и удаления */
+  readOnly?: boolean;
 }
 
-/** Вкладка «Участники»: приглашение, смена роли, удаление, отзыв приглашений. */
-export default function MembersTab({ projectId, currentUserId, onChanged }: Props) {
+/** Вкладка «Участники»: приглашение, роли (у участника их может быть несколько), удаление, отзыв приглашений. */
+export default function MembersTab({ projectId, currentUserId, onChanged, readOnly = false }: Props) {
   const [members, setMembers] = useState<Participant[]>([]);
   const [roles, setRoles] = useState<ProjectRole[]>([]);
   const [invites, setInvites] = useState<Invitation[]>([]);
@@ -22,18 +25,18 @@ export default function MembersTab({ projectId, currentUserId, onChanged }: Prop
 
   const load = useCallback(async () => {
     try {
-      const [m, r, i] = await Promise.all([
-        api.projects.participants(projectId),
-        api.roles.listByProject(projectId),
-        api.projects.invitations(projectId),
-      ]);
+      // Приглашения и список ролей для выдачи нужны только администратору
+      const m = await api.projects.participants(projectId);
       setMembers(m);
-      setRoles(r);
-      setInvites(i);
+      if (!readOnly) {
+        const [r, i] = await Promise.all([api.roles.listByProject(projectId), api.projects.invitations(projectId)]);
+        setRoles(r);
+        setInvites(i);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить участников');
     }
-  }, [projectId]);
+  }, [projectId, readOnly]);
 
   useEffect(() => {
     load();
@@ -65,6 +68,7 @@ export default function MembersTab({ projectId, currentUserId, onChanged }: Prop
 
   return (
     <>
+      {!readOnly && (
       <form className="inline-form" onSubmit={invite}>
         <input
           value={identifier}
@@ -76,6 +80,7 @@ export default function MembersTab({ projectId, currentUserId, onChanged }: Prop
           Пригласить
         </button>
       </form>
+      )}
 
       {error && <div className="notice notice-err">{error}</div>}
 
@@ -88,21 +93,51 @@ export default function MembersTab({ projectId, currentUserId, onChanged }: Prop
               <strong>{m.username}</strong>
               <span className="muted">{m.email}</span>
             </div>
-            <select
-              aria-label={`Роль: ${m.username}`}
-              value={m.roles[0]?.id ?? ''}
-              disabled={busy}
-              onChange={(e) =>
-                run(() => api.projects.setParticipantRole(projectId, m.user_id, Number(e.target.value)))
-              }
-            >
-              {m.roles.length === 0 && <option value="">Без роли</option>}
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
+            <div className="chips role-chips">
+              {m.roles.length === 0 && <span className="muted">Без роли</span>}
+              {m.roles.map((r) => (
+                <span key={r.id} className="fchip on-static">
                   {r.name}
-                </option>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      className="chip-x"
+                      aria-label={`Снять роль «${r.name}» с ${m.username}`}
+                      title={m.roles.length <= 1 ? 'Нельзя снять последнюю роль' : 'Снять роль'}
+                      disabled={busy || m.roles.length <= 1}
+                      onClick={() => run(() => api.projects.removeParticipantRole(projectId, m.user_id, r.id))}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
               ))}
-            </select>
+              {!readOnly && roles.some((r) => !m.roles.some((x) => x.id === r.id)) && (
+                <Dropdown
+                  buttonClassName="add-chip"
+                  ariaLabel={`Добавить роль: ${m.username}`}
+                  title="Добавить роль"
+                  disabled={busy}
+                  button={<Icon name="plus" size={14} />}
+                >
+                  <div className="pick-list">
+                    {roles
+                      .filter((r) => !m.roles.some((x) => x.id === r.id))
+                      .map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className="pick-item"
+                          onClick={() => run(() => api.projects.addParticipantRole(projectId, m.user_id, r.id))}
+                        >
+                          <span>{r.name}</span>
+                        </button>
+                      ))}
+                  </div>
+                </Dropdown>
+              )}
+            </div>
+            {(!readOnly || m.user_id === currentUserId) && (
             <button
               className="icon-btn"
               aria-label={`Удалить участника ${m.username}`}
@@ -112,11 +147,12 @@ export default function MembersTab({ projectId, currentUserId, onChanged }: Prop
             >
               <Icon name="trash" size={18} />
             </button>
+            )}
           </li>
         ))}
       </ul>
 
-      {invites.length > 0 && (
+      {!readOnly && invites.length > 0 && (
         <>
           <h3 className="section-title">Ожидают ответа ({invites.length})</h3>
           <ul className="list">

@@ -1,26 +1,47 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-/** system — следовать настройке ОС, light — светлая (пергамент), dark — тёмная */
-export type ThemePref = 'system' | 'light' | 'dark';
+/**
+ * Четыре темы:
+ *  system-light — «Системная светлая» (наша кофейная светлая)
+ *  system-dark  — «Системная тёмная» (наша кофейная тёмная)
+ *  light        — «Светлая» (обычные бело-серые цвета)
+ *  dark         — «Тёмная» (обычные тёмно-серые цвета)
+ */
+export type ThemePref = 'system-light' | 'system-dark' | 'light' | 'dark';
 
 const KEY = 'vector_theme';
 
-const readPref = (): ThemePref => {
-  try {
-    const v = localStorage.getItem(KEY);
-    return v === 'light' || v === 'dark' ? v : 'system';
-  } catch {
-    return 'system';
-  }
+/** значение атрибута data-theme для темы (см. resources/design/tokens.css) */
+const ATTR: Record<ThemePref, string> = {
+  'system-light': 'light',
+  'system-dark': 'dark',
+  light: 'plain-light',
+  dark: 'plain-dark',
 };
 
 const systemDark = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 
+/** Если тема не выбрана — кофейная, светлая или тёмная по настройке ОС. Старые значения ('system', 'light', 'dark' до v3) тоже понимаем. */
+const readPref = (): ThemePref => {
+  try {
+    const v = localStorage.getItem(KEY);
+    if (v === 'system-light' || v === 'system-dark' || v === 'light' || v === 'dark') {
+      // до v3 «light»/«dark» означали кофейные темы — различаем по флагу версии
+      if ((v === 'light' || v === 'dark') && localStorage.getItem(KEY + '_v') !== '3') {
+        return v === 'dark' ? 'system-dark' : 'system-light';
+      }
+      return v;
+    }
+  } catch {
+    /* ignore */
+  }
+  return systemDark() ? 'system-dark' : 'system-light';
+};
+
 const apply = (pref: ThemePref) => {
-  const dark = pref === 'dark' || (pref === 'system' && systemDark());
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', ATTR[pref]);
 };
 
 interface ThemeState {
@@ -35,17 +56,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     apply(pref);
-    if (pref !== 'system') return;
-    // Системная тема: реагируем на переключение темы в ОС «на лету»
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => apply('system');
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
   }, [pref]);
 
   const setPref = useCallback((p: ThemePref) => {
     try {
       localStorage.setItem(KEY, p);
+      localStorage.setItem(KEY + '_v', '3');
     } catch {
       /* приватный режим — тема просто не запомнится */
     }
@@ -63,7 +79,8 @@ export function useTheme(): ThemeState {
 }
 
 export const THEME_OPTIONS: { id: ThemePref; label: string }[] = [
-  { id: 'system', label: 'Системная' },
+  { id: 'system-light', label: 'Системная светлая' },
+  { id: 'system-dark', label: 'Системная тёмная' },
   { id: 'light', label: 'Светлая' },
   { id: 'dark', label: 'Тёмная' },
 ];

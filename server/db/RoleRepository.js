@@ -68,6 +68,92 @@ export class RoleRepository {
     }
   }
 
+  /** id записи project_participants по id пользователя (или undefined) */
+  static async participantIdByUser(projectId, userId) {
+    const res = await pool.query(
+      'SELECT id FROM project_participants WHERE project_id = $1 AND user_id = $2;',
+      [projectId, userId]
+    );
+    return res.rows[0]?.id;
+  }
+
+  /**
+   * Добавляет участнику ещё одну роль (ролей может быть несколько; права объединяются).
+   * Роль и участник должны принадлежать одному проекту.
+   */
+  static async addRoleToParticipant(projectId, participantId, roleId) {
+    const check = await pool.query(
+      `SELECT
+         EXISTS (SELECT 1 FROM project_participants WHERE id = $1 AND project_id = $3) AS participant_ok,
+         EXISTS (SELECT 1 FROM project_roles WHERE id = $2 AND project_id = $3) AS role_ok;`,
+      [participantId, roleId, projectId]
+    );
+    if (!check.rows[0].participant_ok) throw new Error('404: Участник не найден в проекте');
+    if (!check.rows[0].role_ok) throw new Error('404: Роль не найдена в проекте');
+
+    await pool.query(
+      `INSERT INTO assigned_roles (project_participant_id, project_role_id)
+       VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
+      [participantId, roleId]
+    );
+    return this.getParticipantRoles(participantId);
+  }
+
+  /**
+   * Снимает с участника одну роль. У участника должна остаться хотя бы одна роль
+   * (иначе у него не будет прав на проект), а в проекте — хотя бы один администратор.
+   */
+  static async removeRoleFromParticipant(projectId, participantId, roleId) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const has = await client.query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM assigned_roles WHERE project_participant_id = $1) AS total,
+           EXISTS (
+             SELECT 1 FROM assigned_roles ar
+             JOIN project_roles r ON r.id = ar.project_role_id
+             WHERE ar.project_participant_id = $1 AND ar.project_role_id = $2 AND r.project_id = $3
+           ) AS has_role;`,
+        [participantId, roleId, projectId]
+      );
+      if (!has.rows[0].has_role) throw new Error('404: У участника нет такой роли');
+      if (has.rows[0].total <= 1) {
+        throw new Error('400: У участника должна остаться хотя бы одна роль');
+      }
+
+      const before = await this.adminParticipantIds(projectId, {}, client);
+      await client.query(
+        'DELETE FROM assigned_roles WHERE project_participant_id = $1 AND project_role_id = $2;',
+        [participantId, roleId]
+      );
+      const after = await this.adminParticipantIds(projectId, {}, client);
+      if (before.size > 0 && after.size === 0) {
+        throw new Error('400: В проекте должен остаться хотя бы один администратор');
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    return this.getParticipantRoles(participantId);
+  }
+
+  static async getParticipantRoles(participantId) {
+    const res = await pool.query(
+      `SELECT r.id, r.name
+       FROM assigned_roles ar JOIN project_roles r ON r.id = ar.project_role_id
+       WHERE ar.project_participant_id = $1
+       ORDER BY r.id;`,
+      [participantId]
+    );
+    return res.rows;
+  }
+
   /** Удаляет роль (назначения и права удаляются каскадом) */
   static async deleteRole(roleId) {
     await this.assertAdminSurvivesWithout(roleId);

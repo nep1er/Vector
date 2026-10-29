@@ -17,7 +17,9 @@ interface Props {
   participants: Participant[];
   canInvite: boolean;
   canAddTask: boolean;
+  /** Кнопка настроек видна всем; без ADMIN она открывает окно «О проекте» только для чтения */
   canSettings: boolean;
+  canManage: boolean;
   /** Кнопка «Фильтры» с выпадающим меню */
   filterSlot: ReactNode;
   onParticipants: () => void;
@@ -88,7 +90,7 @@ export default function ProjectShell(p: Props) {
             </div>
           </Dropdown>
           {p.canSettings && (
-            <button className="rail-btn" title="Настройки" aria-label="Настройки" onClick={p.onSettings}>
+            <button className="rail-btn" title={p.canManage ? 'Настройки' : 'О проекте'} aria-label={p.canManage ? 'Настройки' : 'О проекте'} onClick={p.onSettings}>
               <Icon name="settings" />
             </button>
           )}
