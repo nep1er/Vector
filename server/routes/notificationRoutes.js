@@ -32,7 +32,8 @@ router.get('/', authMiddleware, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const unreadOnly = req.query.unread === 'true';
-    res.json(await NotificationRepository.listForUser(req.user.id, { unreadOnly, limit, offset }));
+    const folder = ['main', 'hidden', 'all'].includes(req.query.folder) ? req.query.folder : 'main';
+    res.json(await NotificationRepository.listForUser(req.user.id, { unreadOnly, limit, offset, folder }));
   } catch (e) {
     sendError(res, e, 'Ошибка получения уведомлений');
   }
@@ -47,11 +48,11 @@ router.get('/', authMiddleware, async (req, res) => {
  *     security:
  *       - bearerAuth: []
  *     responses:
- *       200: { description: "{ count: number }" }
+ *       200: { description: "{ count: непрочитанные видимые, hidden: непрочитанные в скрытых }" }
  */
 router.get('/unread-count', authMiddleware, async (req, res) => {
   try {
-    res.json({ count: await NotificationRepository.countUnread(req.user.id) });
+    res.json(await NotificationRepository.countUnread(req.user.id));
   } catch (e) {
     sendError(res, e, 'Ошибка подсчёта уведомлений');
   }
@@ -59,9 +60,41 @@ router.get('/unread-count', authMiddleware, async (req, res) => {
 
 /**
  * @swagger
+ * /api/notifications/settings:
+ *   get:
+ *     summary: "Настройки уведомлений: какие категории (INVITES, ROADMAP, TODO, CARD) уходят в «Скрытые»"
+ *     tags: [Notifications]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "[{category, hidden}]" }
+ *   put:
+ *     summary: "Изменить настройки. Тело: {ROADMAP: true, ...} — true = скрывать"
+ *     tags: [Notifications]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "[{category, hidden}]" }
+ */
+router.get('/settings', authMiddleware, async (req, res) => {
+  try {
+    res.json(await NotificationRepository.getSettings(req.user.id));
+  } catch (e) {
+    sendError(res, e, 'Ошибка получения настроек');
+  }
+});
+
+router.put('/settings', authMiddleware, async (req, res) => {
+  try {
+    res.json(await NotificationRepository.setSettings(req.user.id, req.body));
+  } catch (e) {
+    sendError(res, e, 'Ошибка сохранения настроек');
+  }
+});
+
+/**
+ * @swagger
  * /api/notifications/read-all:
  *   post:
- *     summary: Отметить все уведомления прочитанными
+ *     summary: "Отметить прочитанными все уведомления папки (?folder=main|hidden|all, по умолчанию main)"
  *     tags: [Notifications]
  *     security:
  *       - bearerAuth: []
@@ -70,7 +103,8 @@ router.get('/unread-count', authMiddleware, async (req, res) => {
  */
 router.post('/read-all', authMiddleware, async (req, res) => {
   try {
-    res.json({ updated: await NotificationRepository.markAllRead(req.user.id) });
+    const folder = ['main', 'hidden', 'all'].includes(req.query.folder) ? req.query.folder : 'main';
+    res.json({ updated: await NotificationRepository.markAllReadIn(req.user.id, folder) });
   } catch (e) {
     sendError(res, e, 'Ошибка обновления уведомлений');
   }

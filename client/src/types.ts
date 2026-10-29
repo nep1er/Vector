@@ -204,6 +204,17 @@ export interface AppNotification {
   read_at: string | null;
   /** только для PROJECT_INVITATION: PENDING / ACCEPTED / DECLINED ... */
   invitation_status: string | null;
+  category: NotificationCategory;
+  hidden: boolean;
+  /** только для FRIEND_REQUEST: актуальное состояние заявки */
+  friend_state: 'PENDING' | 'ACCEPTED' | 'GONE' | null;
+}
+
+/** INVITES — приглашения; ROADMAP — изменения на доске; TODO — изменения в ToDo; CARD — карточки, где вы исполнитель */
+export type NotificationCategory = 'INVITES' | 'ROADMAP' | 'TODO' | 'CARD';
+export interface NotificationSetting {
+  category: NotificationCategory;
+  hidden: boolean;
 }
 
 /** Элемент вкладки «Задачи» (GET /api/my-tasks) */

@@ -199,6 +199,20 @@ export class ProjectRepository {
     return res.rows[0];
   }
 
+  /** Самостоятельный выход из проекта — право каждого участника. Единственный администратор выйти не может. */
+  static async leave(projectId, userId) {
+    try {
+      const removed = await this.removeParticipant(projectId, userId);
+      if (!removed) throw new Error('404: Вы не участвуете в этом проекте');
+      return removed;
+    } catch (e) {
+      if (String(e.message).startsWith('400: Нельзя исключить последнего')) {
+        throw new Error('400: Вы единственный администратор проекта. Назначьте администратором другого участника и затем покиньте проект');
+      }
+      throw e;
+    }
+  }
+
   /** Прямое добавление (без приглашения) — участник получает роль «Наблюдатель» */
   static async addParticipant(projectId, userId) {
     const participant = await this.addParticipantWithRole(projectId, userId, OBSERVER_ROLE);

@@ -2445,3 +2445,40 @@ select {
 .meter { display: flex; height: 8px; background: var(--color-border); margin-top: 4px; }
 .meter span { display: block; height: 100%; }
 .meter-done { background: #2f9e5b; } .meter-open { background: #4a8fd6; } .meter-late { background: #e0483e; }
+
+/* ---- Задачи: просторный вид ---- */
+.seg { display: inline-flex; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); overflow: hidden; }
+.seg button { padding: 8px 16px; border: 0; background: var(--color-input); color: var(--color-text); font: inherit; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--color-border-strong); }
+.seg button.on { background: var(--color-accent); color: var(--color-on-accent); }
+.tsummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.tsum { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-left-width: 4px; border-radius: var(--radius-lg); padding: 14px 18px; display: flex; flex-direction: column; }
+.tsum b { font-size: 32px; line-height: 1.1; }
+.tsum span { font-weight: 600; }
+.tsum small { color: var(--color-text-muted); }
+.tsum-overdue { border-left-color: #e0483e; } .tsum-soon { border-left-color: #d9a21b; } .tsum-current { border-left-color: #4a8fd6; }
+.tprojects { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 24px; align-items: start; }
+.trank { margin-top: 8px; }
+.trank-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); margin: 8px 0 4px; }
+.trank-mine .trank-label { color: #e0483e; font-weight: 700; }
+.titem-mine { border-left: 4px solid #e0483e; background: rgba(224, 72, 62, 0.07); }
+.titem-other { opacity: 0.88; }
+@media (max-width: 700px) { .tsummary { grid-template-columns: 1fr; } .tprojects { grid-template-columns: 1fr; } }
+
+/* ---- Уведомления ---- */
+.notif-page .notif-list { max-width: 1100px; }
+.notif-tabs { margin-bottom: 20px; }
+.notif-urgent { margin-bottom: 28px; }
+.notif-urgent h2 { font-size: 18px; margin: 0 0 10px; }
+.notif-big { padding: 16px 18px; border-left: 4px solid var(--color-accent); }
+.notif-big p { font-size: 16px; font-weight: 600; }
+.notif-ico { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: var(--color-accent); color: var(--color-on-accent); flex: none; margin-right: 12px; }
+.notif-day { margin-bottom: 18px; }
+.notif-day h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); }
+.ncat { font-weight: 600; }
+.ncat-roadmap { color: #4a8fd6; } .ncat-todo { color: #d9a21b; } .ncat-card { color: #2f9e5b; } .ncat-invites { color: var(--color-accent); }
+.notif-settings { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 10px; }
+.notif-settings label { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+.notif-settings label input { width: auto; margin-top: 4px; flex: none; }
+.notif-settings label span { display: flex; flex-direction: column; }
+.modal-actions-split { justify-content: space-between; }

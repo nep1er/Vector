@@ -12,6 +12,8 @@ import type {
   DashboardData,
   FriendRow,
   MyTasksProject,
+  NotificationCategory,
+  NotificationSetting,
   ShiftItem,
   ShiftPlan,
   ShiftRecord,
@@ -222,6 +224,7 @@ const projects = {
   cancelInvitation: (projectId: number, invitationId: number) =>
     request<{ message: string }>('DELETE', `/api/projects/${projectId}/invitations/${invitationId}`),
 
+  leave: (projectId: number) => request<{ message: string }>('POST', `/api/projects/${projectId}/leave`),
   removeParticipant: (projectId: number, userId: number) =>
     request<{ message: string }>('DELETE', `/api/projects/${projectId}/participants/${userId}`),
 };
@@ -436,10 +439,13 @@ const taskTags = {
 // NOTIFICATIONS  /api/notifications,  INVITATIONS  /api/invitations
 // ---------------------------------------------------------------------------
 const notifications = {
-  list: () => request<AppNotification[]>('GET', '/api/notifications'),
-  unreadCount: () => request<{ count: number }>('GET', '/api/notifications/unread-count'),
+  list: (folder: 'main' | 'hidden' = 'main') => request<AppNotification[]>('GET', `/api/notifications?folder=${folder}`),
+  unreadCount: () => request<{ count: number; hidden: number }>('GET', '/api/notifications/unread-count'),
+  settings: () => request<NotificationSetting[]>('GET', '/api/notifications/settings'),
+  saveSettings: (body: Partial<Record<NotificationCategory, boolean>>) =>
+    request<NotificationSetting[]>('PUT', '/api/notifications/settings', body),
   markRead: (id: number) => request<unknown>('PATCH', `/api/notifications/${id}/read`),
-  readAll: () => request<unknown>('POST', '/api/notifications/read-all'),
+  readAll: (folder: 'main' | 'hidden' = 'main') => request<unknown>('POST', `/api/notifications/read-all?folder=${folder}`),
   remove: (id: number) => request<unknown>('DELETE', `/api/notifications/${id}`),
 };
 

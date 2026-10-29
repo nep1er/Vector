@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import type { ProjectDetails } from '../types';
 import Modal from './Modal';
@@ -28,6 +30,17 @@ interface Props {
 
 export default function ProjectSettingsModal({ project, initialTab = 'general', canManage = true, onClose, onSaved }: Props) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [leaveError, setLeaveError] = useState('');
+  const leave = async () => {
+    if (!window.confirm(`Покинуть проект «${project.title}»? Вернуться можно будет только по новому приглашению.`)) return;
+    try {
+      await api.projects.leave(project.id);
+      navigate('/');
+    } catch (e: any) {
+      setLeaveError(e.message);
+    }
+  };
   const tabs = canManage ? TABS : TABS.filter((t) => t.id === 'general' || t.id === 'members');
   const [tab, setTab] = useState<SettingsTab>(tabs.some((t) => t.id === initialTab) ? initialTab : 'general');
 
@@ -73,7 +86,11 @@ export default function ProjectSettingsModal({ project, initialTab = 'general', 
         {canManage && tab === 'tags' && <TagsTab projectId={project.id} onChanged={onSaved} />}
       </div>
 
-      <div className="modal-actions">
+      {leaveError && <div className="notice notice-err">{leaveError}</div>}
+      <div className="modal-actions modal-actions-split">
+        <button className="btn btn-danger-ghost" onClick={leave}>
+          Покинуть проект
+        </button>
         <button className="btn btn-secondary" onClick={onClose}>
           Закрыть
         </button>

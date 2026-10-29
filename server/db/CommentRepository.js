@@ -46,7 +46,7 @@ export class CommentRepository {
       const commentId = ins.rows[0].id;
 
       const ctx = await client.query(
-        `SELECT c.title AS card_title, t.project_id, u.username AS author_name
+        `SELECT c.title AS card_title, t.project_id, t.id AS todo_id, u.username AS author_name
          FROM kanban_card c
          JOIN kanban_column col ON col.id = c.kanban_column_id
          JOIN task t ON t.id = col.todo_task_id
@@ -68,6 +68,7 @@ export class CommentRepository {
         'CARD_COMMENT',
         {
           project_id: info.project_id,
+          todo_id: info.todo_id,
           card_id: cardId,
           card_title: info.card_title,
           comment_id: commentId,

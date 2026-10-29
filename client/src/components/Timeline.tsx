@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TaskNode } from '../types';
-import { dayIndex, dayMonth, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
+import { dayIndex, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
 import { statusById, textOn } from '../utils/status';
 import Icon from './Icon';
 
@@ -157,7 +157,7 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
             <div className="ruler-days">
               {ticks.map((d) => (
                 <div key={d} className="ruler-tick" style={{ left: dayLeft(d) }}>
-                  {ppd >= 40 ? dayMonth(d) : dayOfMonth(d)}
+                  {dayOfMonth(d)}
                 </div>
               ))}
             </div>

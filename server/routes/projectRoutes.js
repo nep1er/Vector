@@ -216,6 +216,28 @@ router.post('/:projectId/participants', authMiddleware, checkProjectAccess('ADMI
 
 /**
  * @swagger
+ * /api/projects/{projectId}/leave:
+ *   post:
+ *     summary: "Покинуть проект самостоятельно (любой участник). Единственный администратор выйти не может — сначала назначьте другого"
+ *     tags: [Projects]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Вы покинули проект }
+ *       400: { description: Вы единственный администратор }
+ */
+router.post('/:projectId/leave', authMiddleware, checkProjectAccess('READ'), async (req, res) => {
+  try {
+    await ProjectRepository.leave(Number(req.params.projectId), req.user.id);
+    res.json({ message: 'Вы покинули проект' });
+  } catch (e) {
+    sendError(res, e, 'Ошибка выхода из проекта');
+  }
+});
+
+/**
+ * @swagger
  * /api/projects/{projectId}/participants/{userId}:
  *   delete:
  *     summary: Исключить участника из проекта (право ADMIN)
