@@ -199,6 +199,11 @@ export class ProjectRepository {
     return res.rows[0];
   }
 
+  static async setAvatar(projectId, avatarUrl) {
+    const res = await pool.query('UPDATE project SET avatar_url = $1 WHERE id = $2 RETURNING *;', [avatarUrl, projectId]);
+    return res.rows[0];
+  }
+
   /** Самостоятельный выход из проекта — право каждого участника. Единственный администратор выйти не может. */
   static async leave(projectId, userId) {
     try {

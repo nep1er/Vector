@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
 import { api } from '../api';
 import type { KanbanCard, KanbanColumn } from '../types';
+import { textOn } from '../utils/status';
 import Avatar from './Avatar';
+import Dropdown from './Dropdown';
 import Icon from './Icon';
 import Modal from './Modal';
 
@@ -30,6 +32,8 @@ const isOverdue = (c: KanbanCard) => c.status_id !== 1 && !!c.work_date && new D
  * Канбан-доска: колонки слева направо, карточки сверху вниз.
  * Карточки и колонки перетаскиваются мышью (HTML5 drag&drop); у колонок есть и кнопки «влево/вправо».
  */
+const COLUMN_COLORS = ['#c0392b', '#e67e22', '#d9a21b', '#2f9e5b', '#1abc9c', '#4a8fd6', '#6c5ce7', '#b0529c', '#7f8c8d', '#2c3e50'];
+
 export default function KanbanBoard({ todoId, columns, canMove, canManage, startAddingColumn = false, onReload, onOpenCard, onError }: Props) {
   const [cols, setCols] = useState<KanbanColumn[]>(columns);
   const drag = useRef<Drag>(null);
@@ -172,7 +176,8 @@ export default function KanbanBoard({ todoId, columns, canMove, canManage, start
           aria-label={`Колонка ${col.column_title}`}
         >
           <header
-            className="kcol-head"
+            style={col.column_color ? { background: col.column_color, color: textOn(col.column_color) } : undefined}
+            className={col.column_color ? 'kcol-head kcol-head-colored' : 'kcol-head'}
             draggable={canManage && editingColumn !== col.column_id}
             onDragStart={(e) => {
               drag.current = { type: 'column', id: col.column_id };
@@ -213,6 +218,39 @@ export default function KanbanBoard({ todoId, columns, canMove, canManage, start
             <span className="kcol-count">{col.cards.length}</span>
             {canManage && (
               <span className="kcol-actions">
+                <Dropdown
+                  buttonClassName="icon-btn"
+                  ariaLabel="Цвет шапки колонки"
+                  title="Цвет шапки"
+                  button={<Icon name="theme" size={16} />}
+                >
+                  <div className="color-panel">
+                    <strong>Цвет шапки</strong>
+                    <div className="swatches">
+                      {COLUMN_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          className={col.column_color?.toLowerCase() === c ? 'swatch on' : 'swatch'}
+                          style={{ background: c }}
+                          aria-label={`Цвет ${c}`}
+                          onClick={() => run(() => api.kanban.updateColumn(col.column_id, { color: c }))}
+                        />
+                      ))}
+                    </div>
+                    <label className="color-custom">
+                      Свой цвет
+                      <input
+                        type="color"
+                        value={col.column_color ?? '#8a6a4a'}
+                        onChange={(e) => run(() => api.kanban.updateColumn(col.column_id, { color: e.target.value }))}
+                      />
+                    </label>
+                    <button type="button" className="btn btn-quiet" disabled={!col.column_color} onClick={() => run(() => api.kanban.updateColumn(col.column_id, { color: null }))}>
+                      По умолчанию
+                    </button>
+                  </div>
+                </Dropdown>
                 <button className="icon-btn" aria-label="Сдвинуть колонку влево" title="Влево" disabled={ci === 0} onClick={() => moveColumn(col, -1)}>
                   ‹
                 </button>

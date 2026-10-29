@@ -280,8 +280,12 @@ export class TaskRepository {
     return res.rows[0];
   }
 
-  /** Меняет даты с проверкой: порядок, границы родителя и границы дочерних задач */
-  static async updateTaskDates(taskId, startDate, endDate) {
+  /**
+   * Меняет даты с проверкой: порядок, границы родителя и границы дочерних задач.
+   * shiftChildren — «перетаскивание» этапа на RoadMap: если длительность не менялась, все вложенные
+   * задачи (и их вложенные) сдвигаются на столько же; при изменении длины они проверяются на границы.
+   */
+  static async updateTaskDates(taskId, startDate, endDate, { shiftChildren = false } = {}) {
     const task = await this.findById(taskId);
     if (!task) return undefined;
 
@@ -295,7 +299,11 @@ export class TaskRepository {
       this.validateDateInclusion(parent.start_date, parent.end_date, newStart, newEnd);
     }
 
-    if (newStart || newEnd) {
+    const ms = (v) => (v ? new Date(v).getTime() : null);
+    const delta = ms(newStart) !== null && ms(task.start_date) !== null ? ms(newStart) - ms(task.start_date) : null;
+    const isMove = shiftChildren && delta !== null && delta !== 0 && ms(newEnd) - ms(task.end_date) === delta;
+
+    if (!isMove && (newStart || newEnd)) {
       const out = await pool.query(
         `SELECT id FROM task
          WHERE parent_roadmap_id = $1
@@ -309,11 +317,34 @@ export class TaskRepository {
       }
     }
 
-    const res = await pool.query(
-      `UPDATE task SET start_date = $1, end_date = $2 WHERE id = $3 RETURNING ${TASK_COLUMNS};`,
-      [newStart, newEnd, taskId]
-    );
-    return res.rows[0];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (isMove) {
+        await client.query(
+          `WITH RECURSIVE sub AS (
+             SELECT id FROM task WHERE parent_roadmap_id = $1
+             UNION ALL
+             SELECT t.id FROM task t JOIN sub ON t.parent_roadmap_id = sub.id
+           )
+           UPDATE task SET start_date = start_date + ($2::bigint * interval '1 millisecond'),
+                           end_date = end_date + ($2::bigint * interval '1 millisecond')
+           WHERE id IN (SELECT id FROM sub) RETURNING id;`,
+          [taskId, delta]
+        );
+      }
+      const res = await client.query(
+        `UPDATE task SET start_date = $1, end_date = $2 WHERE id = $3 RETURNING ${TASK_COLUMNS};`,
+        [newStart, newEnd, taskId]
+      );
+      await client.query('COMMIT');
+      return res.rows[0];
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   // =========================================================================

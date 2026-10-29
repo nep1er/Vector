@@ -1,4 +1,7 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { InvitationRepository } from '../db/InvitationRepository.js';
 import { ProjectRepository } from '../db/ProjectRepository.js';
 import { RoleRepository } from '../db/RoleRepository.js';
@@ -6,8 +9,16 @@ import { UserRepository } from '../db/UserRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { checkProjectAccess } from '../middleware/rbacMiddleware.js';
 import { sendError } from '../utils/httpError.js';
+import { IMAGE_EXT, IMAGE_SIGNATURES } from '../utils/images.js';
 
 const router = Router();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const AVATAR_DIR = path.join(__dirname, '..', 'uploads', 'project-avatars');
+const AVATAR_URL_PREFIX = '/uploads/project-avatars/';
+const removeLocalAvatar = async (url) => {
+  if (url && url.startsWith(AVATAR_URL_PREFIX)) await fs.unlink(path.join(AVATAR_DIR, path.basename(url))).catch(() => {});
+};
 
 /**
  * @swagger
@@ -211,6 +222,64 @@ router.post('/:projectId/participants', authMiddleware, checkProjectAccess('ADMI
     res.status(201).json(participant);
   } catch (e) {
     sendError(res, e, 'Ошибка добавления участника в проект');
+  }
+});
+
+/**
+ * @swagger
+ * /api/projects/{projectId}/avatar:
+ *   post:
+ *     summary: "Загрузить аватарку проекта (тело запроса — сама картинка PNG/JPEG/WebP до 2 МБ, Content-Type картинки). Право ADMIN"
+ *     tags: [Projects]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Обновлённый проект (avatar_url) }
+ *   delete:
+ *     summary: Убрать аватарку проекта (снова показывается первая буква названия). Право ADMIN
+ *     tags: [Projects]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: projectId, required: true, schema: { type: integer } }
+ *     responses:
+ *       200: { description: Обновлённый проект }
+ */
+router.post(
+  '/:projectId/avatar',
+  authMiddleware,
+  checkProjectAccess('ADMIN'),
+  express.raw({ type: Object.keys(IMAGE_EXT), limit: '2mb' }),
+  async (req, res) => {
+    try {
+      const type = (req.headers['content-type'] ?? '').split(';')[0].trim();
+      const body = req.body;
+      if (!Buffer.isBuffer(body) || body.length === 0 || !IMAGE_SIGNATURES[type]?.(body)) {
+        return res.status(400).json({ message: 'Загрузите изображение PNG, JPEG или WebP до 2 МБ' });
+      }
+      const projectId = Number(req.params.projectId);
+      await fs.mkdir(AVATAR_DIR, { recursive: true });
+      const fileName = `${projectId}-${Date.now()}.${IMAGE_EXT[type]}`;
+      await fs.writeFile(path.join(AVATAR_DIR, fileName), body);
+      const previous = await ProjectRepository.findById(projectId);
+      const updated = await ProjectRepository.setAvatar(projectId, AVATAR_URL_PREFIX + fileName);
+      await removeLocalAvatar(previous?.avatar_url);
+      res.json(updated);
+    } catch (e) {
+      sendError(res, e, 'Ошибка загрузки аватарки проекта');
+    }
+  }
+);
+
+router.delete('/:projectId/avatar', authMiddleware, checkProjectAccess('ADMIN'), async (req, res) => {
+  try {
+    const projectId = Number(req.params.projectId);
+    const previous = await ProjectRepository.findById(projectId);
+    const updated = await ProjectRepository.setAvatar(projectId, null);
+    await removeLocalAvatar(previous?.avatar_url);
+    res.json(updated);
+  } catch (e) {
+    sendError(res, e, 'Ошибка удаления аватарки проекта');
   }
 });
 

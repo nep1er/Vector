@@ -18,6 +18,8 @@ export interface Project {
   title: string;
   description: string | null;
   created_at: string;
+  /** картинка проекта (NULL — показываем первую букву названия) */
+  avatar_url?: string | null;
   /** id участника в project_participants (приходит только в списке проектов) */
   participant_id?: number;
 }
@@ -84,6 +86,8 @@ export interface KanbanCard {
 export interface KanbanColumn {
   column_id: number;
   column_title: string;
+  /** цвет шапки #RRGGBB или null (по умолчанию) */
+  column_color: string | null;
   position: number;
   cards: KanbanCard[];
 }

@@ -290,8 +290,10 @@ router.patch('/:taskId/subtype-title', authMiddleware, checkTaskAccess('EXECUTE'
  */
 router.patch('/:taskId/dates', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
   try {
-    const { startDate, endDate } = req.body;
-    const updated = await TaskRepository.updateTaskDates(req.params.taskId, startDate, endDate);
+    const { startDate, endDate, shiftChildren } = req.body;
+    const updated = await TaskRepository.updateTaskDates(req.params.taskId, startDate, endDate, {
+      shiftChildren: shiftChildren === true,
+    });
     if (!updated) return res.status(404).json({ message: 'Задача не найдена' });
     res.json(updated);
   } catch (e) {

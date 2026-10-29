@@ -47,7 +47,7 @@ export class KanbanRepository {
 
   static async getBoardByTodoId(todoTaskId) {
     const cols = await pool.query(
-      `SELECT id AS column_id, title AS column_title, position
+      `SELECT id AS column_id, title AS column_title, position, color AS column_color
        FROM kanban_column WHERE todo_task_id = $1 ORDER BY position, id;`,
       [todoTaskId]
     );
@@ -114,7 +114,7 @@ export class KanbanRepository {
   }
 
   /** Переименование и/или перемещение колонки (position — новое место, начиная с 1) */
-  static async updateColumn(columnId, { title, position }) {
+  static async updateColumn(columnId, { title, position, color }) {
     const col = await this.findColumn(columnId);
     if (!col) throw new Error('404: Колонка не найдена');
     return inTransaction(async (client) => {
@@ -123,6 +123,11 @@ export class KanbanRepository {
           cleanTitle(title, 'название колонки', 100),
           columnId,
         ]);
+      }
+      if (color !== undefined) {
+        // null — вернуть цвет по умолчанию
+        if (color !== null && !/^#[0-9a-fA-F]{6}$/.test(String(color))) throw new Error('400: Цвет — в формате #RRGGBB');
+        await client.query('UPDATE kanban_column SET color = $1 WHERE id = $2;', [color, columnId]);
       }
       if (position !== undefined && position !== null) {
         const ids = (

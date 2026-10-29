@@ -224,6 +224,8 @@ const projects = {
   cancelInvitation: (projectId: number, invitationId: number) =>
     request<{ message: string }>('DELETE', `/api/projects/${projectId}/invitations/${invitationId}`),
 
+  uploadAvatar: (projectId: number, image: Blob) => request<Project>('POST', `/api/projects/${projectId}/avatar`, image),
+  removeAvatar: (projectId: number) => request<Project>('DELETE', `/api/projects/${projectId}/avatar`),
   leave: (projectId: number) => request<{ message: string }>('POST', `/api/projects/${projectId}/leave`),
   removeParticipant: (projectId: number, userId: number) =>
     request<{ message: string }>('DELETE', `/api/projects/${projectId}/participants/${userId}`),
@@ -263,8 +265,8 @@ const tasks = {
   updateSubtypeTitle: (taskId: number, type: 'ROADMAP' | 'TODO', title: string) =>
     request<unknown>('PATCH', `/api/tasks/${taskId}/subtype-title`, { type, title }),
 
-  updateDates: (taskId: number, startDate?: string, endDate?: string) =>
-    request<Task>('PATCH', `/api/tasks/${taskId}/dates`, { startDate, endDate }),
+  updateDates: (taskId: number, startDate?: string, endDate?: string, shiftChildren = false) =>
+    request<Task>('PATCH', `/api/tasks/${taskId}/dates`, { startDate, endDate, shiftChildren }),
 
   /** Роли, которым видна задача (пусто = все) */
   visibility: (taskId: number) =>
@@ -292,7 +294,7 @@ const kanban = {
     request<{ id: number }>('POST', '/api/kanban/columns', { todoTaskId, title, position }),
 
   /** title — переименование, position (с 1) — новое место колонки */
-  updateColumn: (columnId: number, data: { title?: string; position?: number }) =>
+  updateColumn: (columnId: number, data: { title?: string; position?: number; color?: string | null }) =>
     request<unknown>('PATCH', `/api/kanban/columns/${columnId}`, data),
 
   /** Если в колонке есть карточки: moveTo — перенести их в другую колонку, withCards — удалить вместе с ними */

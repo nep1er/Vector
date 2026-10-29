@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, assetUrl } from '../api';
 import CreateProjectModal from '../components/CreateProjectModal';
 import Icon from '../components/Icon';
 import type { Project } from '../types';
@@ -86,7 +86,11 @@ export default function ProjectsPage() {
                     className="tile-cover"
                     style={{ background: `var(--gradient-project-${(p.id % GRADIENTS) + 1})` }}
                   >
-                    <span className="tile-letter">{p.title.trim().charAt(0).toUpperCase()}</span>
+                    {p.avatar_url ? (
+                      <img className="tile-img" src={assetUrl(p.avatar_url) ?? ''} alt="" />
+                    ) : (
+                      <span className="tile-letter">{p.title.trim().charAt(0).toUpperCase()}</span>
+                    )}
                   </div>
                   <div className="tile-body">
                     <div className="tile-title">{p.title}</div>

@@ -1,6 +1,7 @@
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TaskNode } from '../types';
-import { dayIndex, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
+import { DAY, dayIndex, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
 import { statusById, textOn } from '../utils/status';
 import Icon from './Icon';
 
@@ -16,12 +17,25 @@ interface Props {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
   onOpen: (task: TaskNode) => void;
+  /** Можно ли тянуть и растягивать дорожки мышью (право руководителя) */
+  canEdit?: boolean;
+  /** Новые даты после перетаскивания (ISO). Бросает ошибку, если сервер отказал. */
+  onChangeDates?: (task: TaskNode, startIso: string, endIso: string) => Promise<void>;
+}
+
+interface DragState {
+  id: number;
+  mode: 'move' | 'l' | 'r';
+  ds: number; // сдвиг начала в днях
+  de: number; // сдвиг конца в днях
 }
 
 /** Дорожки на временной шкале: задачи — «клипы», пересекающиеся по времени ложатся на разные дорожки. */
-export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }: Props) {
+export default function Timeline({ tasks, range, selectedId, onSelect, onOpen, canEdit, onChangeDates }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState<number | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const suppressClick = useRef(false);
 
   const dated = useMemo(() => tasks.filter((t) => t.start_date && t.end_date), [tasks]);
   const undated = useMemo(() => tasks.filter((t) => !t.start_date || !t.end_date), [tasks]);
@@ -115,6 +129,60 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Перетаскивание как в видеоредакторе: за середину — сдвиг, за края — смена начала/конца (шаг — день) */
+  const startDrag = (ev: ReactPointerEvent, task: TaskNode, s: number, e: number, mode: DragState['mode']) => {
+    if (!canEdit || !onChangeDates || ev.button !== 0) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    const el = scrollRef.current;
+    const x0 = ev.clientX;
+    const sl0 = el?.scrollLeft ?? 0;
+    const lo = range.start ? dayIndex(range.start) : -Infinity;
+    const hi = range.end ? dayIndex(range.end) : Infinity;
+    let state: DragState = { id: task.id, mode, ds: 0, de: 0 };
+    let moved = false;
+
+    const onMove = (m: PointerEvent) => {
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (m.clientX > r.right - 40) el.scrollLeft += 18;
+        else if (m.clientX < r.left + 40) el.scrollLeft -= 18;
+      }
+      const px = m.clientX - x0 + ((el?.scrollLeft ?? 0) - sl0);
+      if (!moved && Math.abs(px) < 4) return;
+      moved = true;
+      const dd = Math.round(px / ppd);
+      let ds = 0;
+      let de = 0;
+      if (mode === 'move') ds = de = Math.min(Math.max(dd, lo - s), hi - e);
+      else if (mode === 'l') ds = Math.min(Math.max(dd, lo - s), e - s);
+      else de = Math.max(Math.min(dd, hi - e), s - e);
+      state = { id: task.id, mode, ds, de };
+      setDrag(state);
+    };
+    const onUp = async () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (!moved) return setDrag(null);
+      suppressClick.current = true;
+      setTimeout(() => (suppressClick.current = false), 0);
+      if (state.ds === 0 && state.de === 0) return setDrag(null);
+      try {
+        await onChangeDates(
+          task,
+          new Date(Date.parse(task.start_date!) + state.ds * DAY).toISOString(),
+          new Date(Date.parse(task.end_date!) + state.de * DAY).toISOString(),
+        );
+      } finally {
+        setDrag(null);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   const changeZoom = (delta: number) => {
     const next = ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, zoomIdx + delta))];
     setZoom(next);
@@ -174,13 +242,16 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
               <div className="today-line" style={{ left: dayLeft(today) + ppd / 2 }} />
             )}
 
-            {placed.map(({ task, s, e, lane }) => {
+            {placed.map(({ task, s: s0, e: e0, lane }) => {
+              const dr = drag && drag.id === task.id ? drag : null;
+              const s = s0 + (dr?.ds ?? 0);
+              const e = e0 + (dr?.de ?? 0);
               const width = (e - s + 1) * ppd - 2;
               const isRoadmap = task.type === 'ROADMAP';
               return (
                 <button
                   key={task.id}
-                  className={`clip ${isRoadmap ? 'clip-roadmap' : 'clip-todo'}${
+                  className={`clip ${isRoadmap ? 'clip-roadmap' : 'clip-todo'}${canEdit ? ' clip-editable' : ''}${dr ? ' clip-dragging' : ''}${
                     selectedId === task.id ? ' selected' : ''
                   }`}
                   style={{
@@ -195,12 +266,21 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen }:
                   title={`${task.title}\n${formatDay(s)} — ${formatDay(e)}\n${statusById(task.status_id).name}${
                     task.tags.length ? `\n# ${task.tags.map((t) => t.name).join(', ')}` : ''
                   }`}
+                  onPointerDown={(ev) => startDrag(ev, task, s0, e0, 'move')}
                   onClick={(ev) => {
                     ev.stopPropagation();
+                    if (suppressClick.current) return;
                     onSelect(task.id);
                   }}
                   onDoubleClick={() => onOpen(task)}
                 >
+                  {canEdit && <span className="clip-handle clip-handle-l" onPointerDown={(ev) => startDrag(ev, task, s0, e0, 'l')} />}
+                  {canEdit && <span className="clip-handle clip-handle-r" onPointerDown={(ev) => startDrag(ev, task, s0, e0, 'r')} />}
+                  {dr && (
+                    <span className="clip-tip">
+                      {formatDay(s)} — {formatDay(e)} · {e - s + 1} дн.
+                    </span>
+                  )}
                   <span className="clip-title">
                     <Icon name={isRoadmap ? 'roadmap' : 'tasks'} size={14} />
                     {task.title}

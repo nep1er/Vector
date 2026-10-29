@@ -41,6 +41,7 @@ export default function ProjectPage() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showShift, setShowShift] = useState(false);
+  const [dragError, setDragError] = useState('');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [projectTags, setProjectTags] = useState<TaskTag[]>([]);
   const [projectRoles, setProjectRoles] = useState<ProjectRole[]>([]);
@@ -156,7 +157,23 @@ export default function ProjectPage() {
           selectedId={selectedId}
           onSelect={setSelectedId}
           onOpen={openRoadmap}
+          canEdit={can('EXECUTE')}
+          onChangeDates={async (task, startDate, endDate) => {
+            try {
+              // вложенные задачи едут вместе с этапом
+              await api.tasks.updateDates(task.id, startDate, endDate, true);
+              await load();
+            } catch (e: any) {
+              setDragError(e.message ?? 'Не удалось изменить сроки');
+              throw e;
+            }
+          }}
         />
+        {dragError && (
+          <div className="notice notice-err drag-error" role="alert" onClick={() => setDragError('')}>
+            {dragError}
+          </div>
+        )}
         {selected && (
           <TaskInspector
             task={selected}
