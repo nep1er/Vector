@@ -70,7 +70,7 @@ export default function StoragesSection({ projectId, canManage }: Props) {
             <span className="storage-name">{f.name}</span>
             {f.visible_roles.length > 0 && (
               <span className="storage-lock" title={`Видят только: ${f.visible_roles.map((r) => r.name).join(', ')}`}>
-                🔒
+                (PRIVATE)
               </span>
             )}
             <span className="storage-count">{f.files.length}</span>
