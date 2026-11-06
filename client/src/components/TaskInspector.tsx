@@ -6,6 +6,7 @@ import { TASK_STATUSES, statusById } from '../utils/status';
 import { endIso, inputToDay, isoToInput, startIso } from '../utils/dates';
 import Dropdown from './Dropdown';
 import Icon from './Icon';
+import TaskExtensionPanels from './extensions/TaskExtensionPanels';
 
 interface Props {
   task: TaskNode;
@@ -303,6 +304,8 @@ export default function TaskInspector({ task, canEdit, projectTags, projectRoles
           ? `Открыть RoadMap${task.children.length > 0 ? ` (${task.children.length})` : ''}`
           : 'Открыть доску'}
       </button>
+
+      <TaskExtensionPanels projectId={task.project_id} taskId={task.id} />
 
       {canEdit &&
         (confirmDelete ? (

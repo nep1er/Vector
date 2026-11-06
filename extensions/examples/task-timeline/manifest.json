@@ -1,0 +1,12 @@
+{
+  "apiVersion": 1,
+  "id": "task-timeline",
+  "name": "Сроки задач",
+  "version": "1.0.0",
+  "description": "Компактный график сроков всех задач проекта и панель со сроками в карточке задачи. Только чтение.",
+  "author": "Vector",
+  "icon": "icon.svg",
+  "permissions": ["tasks:read", "ui:view", "ui:task-panel"],
+  "views": [{ "id": "timeline", "title": "График сроков", "entry": "index.html" }],
+  "taskPanels": [{ "id": "dates", "title": "Сроки", "entry": "panel.html", "height": 110 }]
+}

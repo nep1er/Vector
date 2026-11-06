@@ -13,6 +13,8 @@ export default defineConfig({
       '/api': 'http://localhost:5000',
       '/public': 'http://localhost:5000',
       '/uploads': 'http://localhost:5000', // загруженные аватарки
+      '/ext': 'http://localhost:5000', // файлы расширений (в проде — отдельный origin)
+      '/extp': 'http://localhost:5000', // предпросмотр расширений
     },
   },
 });

@@ -34,6 +34,7 @@ export type IconName =
   | 'shift'
   | 'dashboard'
   | 'theme'
+  | 'puzzle'
   | 'chevron-down';
 
 export default function Icon({ name, size = 20 }: { name: IconName; size?: number }) {

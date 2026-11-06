@@ -21,6 +21,8 @@ import taskShiftRoutes from './routes/taskShiftRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import storageRoutes from './routes/storageRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
+import extensionRoutes from './routes/extensionRoutes.js';
+import extensionServeRoutes from './routes/extensionServeRoutes.js';
 
 dotenv.config();
 
@@ -66,6 +68,8 @@ app.use('/api/my-tasks', myTasksRoutes);
 app.use('/api/task-shifts', taskShiftRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/friends', friendRoutes);
+app.use('/api', extensionRoutes); // /api/extensions, /api/moderation, /api/platform
+app.use(extensionServeRoutes); // /ext/..., /extp/... (в проде — на отдельном origin)
 
 // Слишком большой файл — понятный JSON вместо HTML-страницы
 app.use((err, req, res, next) => {

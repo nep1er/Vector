@@ -37,6 +37,10 @@ export default function Sidebar({ open }: { open: boolean }) {
           <Icon name="users" />
           Друзья
         </NavLink>
+        <NavLink to="/extensions" className={linkClass}>
+          <Icon name="puzzle" />
+          Расширения
+        </NavLink>
         <NavLink to="/notifications" className={linkClass}>
           <Icon name="bell" />
           Уведомления

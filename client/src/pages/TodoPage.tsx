@@ -117,6 +117,7 @@ export default function TodoPage() {
 
   return (
     <ProjectShell
+      projectId={pid}
       crumbs={crumbs}
       participants={participants}
       canInvite={can('ADMIN')}

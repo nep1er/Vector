@@ -135,6 +135,7 @@ export default function ProjectPage() {
 
   return (
     <ProjectShell
+      projectId={pid}
       crumbs={crumbs}
       participants={participants}
       canInvite={can('ADMIN')}

@@ -8,14 +8,16 @@ import GeneralTab from './settings/GeneralTab';
 import MembersTab from './settings/MembersTab';
 import RolesTab from './settings/RolesTab';
 import TagsTab from './settings/TagsTab';
+import ExtensionsTab from './settings/ExtensionsTab';
 
-export type SettingsTab = 'general' | 'members' | 'roles' | 'tags';
+export type SettingsTab = 'general' | 'members' | 'roles' | 'tags' | 'extensions';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'general', label: 'Общие' },
   { id: 'members', label: 'Участники' },
   { id: 'roles', label: 'Роли' },
   { id: 'tags', label: 'Теги задач' },
+  { id: 'extensions', label: 'Расширения' },
 ];
 
 interface Props {
@@ -84,6 +86,7 @@ export default function ProjectSettingsModal({ project, initialTab = 'general', 
         )}
         {canManage && tab === 'roles' && <RolesTab projectId={project.id} onChanged={onSaved} />}
         {canManage && tab === 'tags' && <TagsTab projectId={project.id} onChanged={onSaved} />}
+        {canManage && tab === 'extensions' && <ExtensionsTab projectId={project.id} onChanged={onSaved} />}
       </div>
 
       {leaveError && <div className="notice notice-err">{leaveError}</div>}

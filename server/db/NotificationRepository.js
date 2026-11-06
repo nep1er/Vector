@@ -42,9 +42,12 @@ export class NotificationRepository {
   static CATEGORY_SQL = `CASE n.type
       WHEN 'TASK_STATUS_CHANGED' THEN CASE WHEN t.type = 'TODO' THEN 'TODO' ELSE 'ROADMAP' END
       WHEN 'CARD_COMMENT' THEN 'CARD'
+      WHEN 'EXTENSION_DISABLED' THEN 'SYSTEM'
+      WHEN 'EXTENSION_BAN' THEN 'SYSTEM'
+      WHEN 'EXTENSION_REVIEW' THEN 'SYSTEM'
       ELSE 'INVITES' END`;
 
-  static CATEGORIES = ['INVITES', 'ROADMAP', 'TODO', 'CARD'];
+  static CATEGORIES = ['INVITES', 'ROADMAP', 'TODO', 'CARD', 'SYSTEM'];
 
   static BASE = `
     FROM notifications n

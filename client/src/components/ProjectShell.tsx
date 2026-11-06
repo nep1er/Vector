@@ -5,6 +5,7 @@ import Avatar from './Avatar';
 import Icon from './Icon';
 import Dropdown from './Dropdown';
 import Logo from './Logo';
+import ProjectExtensionsMenu from './extensions/ProjectExtensionsMenu';
 import ThemeSwitcher from './ThemeSwitcher';
 
 export interface Crumb {
@@ -14,6 +15,8 @@ export interface Crumb {
 
 interface Props {
   crumbs: Crumb[];
+  /** id проекта — для меню расширений */
+  projectId?: number;
   participants: Participant[];
   canInvite: boolean;
   canAddTask: boolean;
@@ -78,6 +81,7 @@ export default function ProjectShell(p: Props) {
 
         <div className="rail-section rail-bottom">
           {p.filterSlot}
+          {p.projectId && <ProjectExtensionsMenu projectId={p.projectId} />}
           {p.onDashboard && (
             <button className="rail-btn" title="Дашборд" aria-label="Дашборд" onClick={p.onDashboard}>
               <Icon name="dashboard" />

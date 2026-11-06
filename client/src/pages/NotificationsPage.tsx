@@ -13,6 +13,7 @@ const CATEGORY: Record<NotificationCategory, { label: string; hint: string }> = 
   ROADMAP: { label: 'Изменения на доске', hint: 'Смена статусов этапов RoadMap' },
   TODO: { label: 'Изменения в ToDo', hint: 'Смена статусов ToDo-задач' },
   CARD: { label: 'Мои карточки', hint: 'События в карточках, где вы исполнитель' },
+  SYSTEM: { label: 'Расширения и модерация', hint: 'Проверка ваших расширений, баны, отключение расширений в проектах' },
 };
 
 /** Текст и ссылка уведомления по его типу и payload. */
@@ -29,6 +30,19 @@ function describe(n: AppNotification): { text: string; to?: string } {
       return { text: `${p.from_username} хочет добавить вас в друзья` };
     case 'FRIEND_ACCEPTED':
       return { text: `${p.username} принял вашу заявку в друзья` };
+    case 'EXTENSION_DISABLED':
+      return { text: `Расширение «${p.extension_name}» отключено в проекте «${p.project_title}»${p.reason ? `: ${p.reason}` : ''}`, to: `/projects/${p.project_id}` };
+    case 'EXTENSION_BAN':
+      return { text: p.banned ? `Вам закрыта публикация расширений. Причина: ${p.reason}` : 'Ограничение на публикацию расширений снято', to: '/extensions' };
+    case 'EXTENSION_REVIEW': {
+      const what = `«${p.extension_name}»${p.version ? ` ${p.version}` : ''}`;
+      const text =
+        p.kind === 'SUBMITTED' ? `Новая версия расширения ${what} ждёт проверки`
+        : p.kind === 'APPROVED' ? `Ваше расширение ${what} одобрено и доступно в каталоге`
+        : p.kind === 'REJECTED' ? `Ваше расширение ${what} отклонено: ${p.note}`
+        : `Ваше расширение ${what} удалено модератором: ${p.note}`;
+      return { text, to: '/extensions' };
+    }
     default:
       return { text: 'Новое уведомление' };
   }

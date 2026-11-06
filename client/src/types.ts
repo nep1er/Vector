@@ -197,7 +197,10 @@ export type NotificationType =
   | 'CARD_COMMENT'
   | 'TASK_STATUS_CHANGED'
   | 'FRIEND_REQUEST'
-  | 'FRIEND_ACCEPTED';
+  | 'FRIEND_ACCEPTED'
+  | 'EXTENSION_DISABLED'
+  | 'EXTENSION_BAN'
+  | 'EXTENSION_REVIEW';
 
 export interface AppNotification {
   id: number;
@@ -215,7 +218,7 @@ export interface AppNotification {
 }
 
 /** INVITES — приглашения; ROADMAP — изменения на доске; TODO — изменения в ToDo; CARD — карточки, где вы исполнитель */
-export type NotificationCategory = 'INVITES' | 'ROADMAP' | 'TODO' | 'CARD';
+export type NotificationCategory = 'INVITES' | 'ROADMAP' | 'TODO' | 'CARD' | 'SYSTEM';
 export interface NotificationSetting {
   category: NotificationCategory;
   hidden: boolean;
@@ -324,4 +327,203 @@ export interface DashboardData {
   people: { id: number; user_id: number; username: string; avatar_url: string | null; assigned: number; done: number; overdue: number }[];
   todo_progress: (DashTask & { cards_total: number; cards_done: number })[];
   shifts: { count: number; days: number; tasks: number; last_at: string | null };
+}
+
+// ---------------------------------------------------------------------------
+// Расширения
+// ---------------------------------------------------------------------------
+export type ExtPermission =
+  | 'tasks:read'
+  | 'tasks:write'
+  | 'kanban:read'
+  | 'kanban:write'
+  | 'members:read'
+  | 'storage:read'
+  | 'ui:view'
+  | 'ui:task-panel';
+
+export interface ExtManifest {
+  apiVersion: number;
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  icon: string | null;
+  permissions: ExtPermission[];
+  views: { id: string; title: string; entry: string }[];
+  taskPanels: { id: string; title: string; entry: string; height?: number }[];
+}
+
+export type PlatformRole = 'ADMIN' | 'MODERATOR' | null;
+
+export interface PlatformMe {
+  role: PlatformRole;
+  ban: { reason: string; banned_at: string; banned_by_name: string | null } | null;
+  permissions: ExtPermission[];
+}
+
+export interface PackageReport {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  manifest: ExtManifest | null;
+  size: number;
+  files: { path: string; size: number }[];
+}
+
+export interface CatalogExtension {
+  id: number;
+  slug: string;
+  name: string;
+  summary: string;
+  author_id: number;
+  author_name: string;
+  version_id: number;
+  version: string;
+  manifest: ExtManifest;
+  library_count: number;
+  in_library: boolean;
+}
+
+export interface LibraryExtension {
+  id: number;
+  slug: string;
+  name: string;
+  summary: string;
+  author_name: string;
+  version_id: number | null;
+  version: string | null;
+  manifest: ExtManifest | null;
+  added_at: string;
+  unusable: 'REMOVED' | 'BANNED' | 'NOT_APPROVED' | null;
+}
+
+export type VersionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface ExtVersion {
+  id: number;
+  version: string;
+  manifest: ExtManifest;
+  warnings: string[];
+  size_bytes: number;
+  file_count: number;
+  status: VersionStatus;
+  review_note: string | null;
+  created_at: string;
+}
+
+export interface ExtensionDetails {
+  id: number;
+  slug: string;
+  name: string;
+  summary: string;
+  status: 'ACTIVE' | 'REMOVED';
+  author_id: number;
+  author_name: string;
+  author_banned: boolean;
+  in_library: boolean;
+  library_count: number;
+  removed_reason?: string | null;
+  versions: ExtVersion[];
+}
+
+export interface MyExtension {
+  id: number;
+  slug: string;
+  name: string;
+  summary: string;
+  status: 'ACTIVE' | 'REMOVED';
+  removed_reason: string | null;
+  library_count: number;
+  versions: { id: number; version: string; status: VersionStatus; review_note: string | null; warnings: string[]; created_at: string }[];
+}
+
+export interface ProjectExtension {
+  id: number;
+  extension_id: number;
+  version_id: number;
+  slug: string;
+  name: string;
+  author_name: string;
+  version: string;
+  manifest: ExtManifest;
+  granted_permissions: ExtPermission[];
+  enabled: boolean;
+  unusable: 'REMOVED' | 'BANNED' | 'NOT_APPROVED' | null;
+  usable: boolean;
+  update: { version: string; new_permissions: ExtPermission[] } | null;
+}
+
+export interface ExtAuditRow {
+  method: string;
+  ok: boolean;
+  created_at: string;
+  username: string | null;
+}
+
+export interface ModQueueItem {
+  id: number;
+  version: string;
+  manifest: ExtManifest;
+  warnings: string[];
+  size_bytes: number;
+  file_count: number;
+  created_at: string;
+  extension_id: number;
+  name: string;
+  slug: string;
+  author_id: number;
+  author_name: string;
+  author_banned: boolean;
+}
+
+export interface ModExtensionRow {
+  id: number;
+  slug: string;
+  name: string;
+  status: 'ACTIVE' | 'REMOVED';
+  removed_reason: string | null;
+  author_id: number;
+  author_name: string;
+  author_banned: boolean;
+  library_count: number;
+  projects_count: number;
+}
+
+export interface ExtBan {
+  user_id: number;
+  username: string;
+  reason: string;
+  banned_at: string;
+  banned_by_name: string | null;
+  extensions_count: number;
+}
+
+export interface ExtReport {
+  id: number;
+  extension_id: number;
+  extension_name: string;
+  reason: string;
+  created_at: string;
+  reporter_name: string | null;
+}
+
+export interface ModLogRow {
+  id: number;
+  actor_name: string;
+  action: string;
+  target_type: string;
+  target_name: string | null;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface StaffRow {
+  id: number;
+  username: string;
+  email: string;
+  avatar_url: string | null;
+  role: 'ADMIN' | 'MODERATOR';
+  granted_by_name: string | null;
 }

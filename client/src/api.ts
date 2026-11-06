@@ -10,6 +10,21 @@ import type {
   CardComment,
   CardFile,
   DashboardData,
+  ExtAuditRow,
+  ExtBan,
+  ExtPermission,
+  ExtReport,
+  ExtensionDetails,
+  CatalogExtension,
+  LibraryExtension,
+  ModExtensionRow,
+  ModLogRow,
+  ModQueueItem,
+  MyExtension,
+  PackageReport,
+  PlatformMe,
+  ProjectExtension,
+  StaffRow,
   FriendRow,
   MyTasksProject,
   NotificationCategory,
@@ -517,6 +532,89 @@ const myTasks = {
   list: () => request<MyTasksProject[]>('GET', '/api/my-tasks'),
 };
 
+// ---------------------------------------------------------------------------
+// РАСШИРЕНИЯ  /api/extensions, /api/moderation, /api/platform
+// ---------------------------------------------------------------------------
+/** Адрес, с которого отдаются файлы расширений. В продакшене — ОТДЕЛЬНЫЙ origin (VITE_EXT_URL) */
+const EXT_BASE: string = import.meta.env.VITE_EXT_URL ?? BASE_URL;
+export const extFileUrl = (versionId: number, path: string) => `${EXT_BASE}/ext/${versionId}/${path}`;
+export const extPreviewUrl = (token: string, versionId: number, path: string) =>
+  `${EXT_BASE}/extp/${token}/${versionId}/${path}`;
+
+/** Загрузка архива: ответ 422 содержит отчёт проверки — возвращаем его, а не бросаем ошибку */
+async function uploadPackage(file: File, dryRun: boolean): Promise<PackageReport> {
+  const token = tokenStorage.get();
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/extensions${dryRun ? '?dryRun=1' : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/zip', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: file,
+    });
+  } catch {
+    throw new ApiError(0, 'Не удалось связаться с сервером. Проверьте, что он запущен.');
+  }
+  const data = await res.json().catch(() => null);
+  if (res.status === 422 && data) return data as PackageReport;
+  if (!res.ok) throw new ApiError(res.status, data?.message ?? `Ошибка сервера (${res.status})`);
+  return data as PackageReport;
+}
+
+const extensions = {
+  platformMe: () => request<PlatformMe>('GET', '/api/platform/me'),
+  catalog: (q = '') => request<CatalogExtension[]>('GET', `/api/extensions${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  library: () => request<LibraryExtension[]>('GET', '/api/extensions/library'),
+  mine: () => request<MyExtension[]>('GET', '/api/extensions/mine'),
+  details: (id: number) => request<ExtensionDetails>('GET', `/api/extensions/${id}`),
+  validate: (file: File) => uploadPackage(file, true),
+  upload: (file: File) => uploadPackage(file, false),
+  removeOwn: (id: number) => request<unknown>('DELETE', `/api/extensions/${id}`),
+  addToLibrary: (id: number) => request<unknown>('POST', `/api/extensions/${id}/library`),
+  removeFromLibrary: (id: number) => request<unknown>('DELETE', `/api/extensions/${id}/library`),
+  report: (id: number, reason: string) => request<unknown>('POST', `/api/extensions/${id}/report`, { reason }),
+  previewToken: (versionId: number) =>
+    request<{ token: string }>('POST', `/api/extensions/versions/${versionId}/preview-token`),
+
+  forProject: (projectId: number) => request<ProjectExtension[]>('GET', `/api/extensions/projects/${projectId}`),
+  install: (projectId: number, extensionId: number, permissions: ExtPermission[]) =>
+    request<unknown>('POST', `/api/extensions/projects/${projectId}`, { extension_id: extensionId, permissions }),
+  patchInstall: (projectId: number, extensionId: number, data: { enabled?: boolean; permissions?: ExtPermission[] }) =>
+    request<unknown>('PATCH', `/api/extensions/projects/${projectId}/${extensionId}`, data),
+  updateInstall: (projectId: number, extensionId: number, permissions: ExtPermission[]) =>
+    request<unknown>('POST', `/api/extensions/projects/${projectId}/${extensionId}/update`, { permissions }),
+  removeInstall: (projectId: number, extensionId: number) =>
+    request<unknown>('DELETE', `/api/extensions/projects/${projectId}/${extensionId}`),
+  audit: (projectId: number, extensionId: number) =>
+    request<ExtAuditRow[]>('GET', `/api/extensions/projects/${projectId}/${extensionId}/audit`),
+  recordAudit: (projectId: number, extensionId: number, entries: { method: string; ok: boolean }[]) =>
+    request<unknown>('POST', `/api/extensions/projects/${projectId}/${extensionId}/audit`, { entries }),
+};
+
+const moderation = {
+  queue: () => request<ModQueueItem[]>('GET', '/api/moderation/queue'),
+  extensions: (q = '') => request<ModExtensionRow[]>('GET', `/api/moderation/extensions${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  files: (versionId: number) =>
+    request<{ files: { path: string; size: number }[] }>('GET', `/api/moderation/versions/${versionId}/files`),
+  fileText: (versionId: number, path: string) =>
+    request<{ text: string }>('GET', `/api/moderation/versions/${versionId}/files?path=${encodeURIComponent(path)}`),
+  approve: (versionId: number, note?: string) => request<unknown>('POST', `/api/moderation/versions/${versionId}/approve`, { note }),
+  reject: (versionId: number, note: string) => request<unknown>('POST', `/api/moderation/versions/${versionId}/reject`, { note }),
+  removeExtension: (id: number, reason: string) => request<unknown>('POST', `/api/moderation/extensions/${id}/remove`, { reason }),
+  restoreExtension: (id: number) => request<unknown>('POST', `/api/moderation/extensions/${id}/restore`),
+  bans: () => request<ExtBan[]>('GET', '/api/moderation/bans'),
+  ban: (identifier: string, reason: string) => request<{ message: string }>('POST', '/api/moderation/bans', { identifier, reason }),
+  unban: (userId: number) => request<unknown>('DELETE', `/api/moderation/bans/${userId}`),
+  reports: () => request<ExtReport[]>('GET', '/api/moderation/reports'),
+  resolveReport: (id: number) => request<unknown>('POST', `/api/moderation/reports/${id}/resolve`),
+  log: () => request<ModLogRow[]>('GET', '/api/moderation/log'),
+};
+
+const platform = {
+  staff: () => request<StaffRow[]>('GET', '/api/platform/moderators'),
+  addModerator: (identifier: string) => request<unknown>('POST', '/api/platform/moderators', { identifier }),
+  removeModerator: (userId: number) => request<unknown>('DELETE', `/api/platform/moderators/${userId}`),
+};
+
 export const api = {
   auth,
   projects,
@@ -532,4 +630,7 @@ export const api = {
   myTasks,
   shifts,
   dashboard,
+  extensions,
+  moderation,
+  platform,
 };
