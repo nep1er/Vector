@@ -306,8 +306,71 @@ export class ExtensionRepository {
   }
 
   static async removeInstall(projectId, extensionId) {
+    await pool.query('DELETE FROM extension_data WHERE project_id = $1 AND extension_id = $2;', [projectId, extensionId]);
     const res = await pool.query('DELETE FROM project_extension WHERE project_id = $1 AND extension_id = $2 RETURNING id;', [projectId, extensionId]);
     if (res.rowCount === 0) throw new Error('404: Расширение не установлено в этом проекте');
+  }
+
+  // ------------------------------------------------------------ данные расширения
+  /** Проверка, что расширение установлено, работает и ему выдано право perm. Возвращает строку установки. */
+  static async dataGate(projectId, extensionId, perm) {
+    const row = (
+      await pool.query(
+        `SELECT pe.id, pe.enabled, pe.granted_permissions, e.status AS ext_status, v.status AS version_status,
+                EXISTS (SELECT 1 FROM extension_ban b WHERE b.user_id = e.author_id) AS author_banned
+         FROM project_extension pe JOIN extension e ON e.id = pe.extension_id JOIN extension_version v ON v.id = pe.version_id
+         WHERE pe.project_id = $1 AND pe.extension_id = $2;`,
+        [projectId, extensionId]
+      )
+    ).rows[0];
+    if (!row) throw new Error('404: Расширение не установлено в этом проекте');
+    if (!row.enabled || unusableReason(row)) throw new Error('403: Расширение сейчас отключено');
+    if (!row.granted_permissions.includes(perm)) throw new Error(`403: Проект не выдал расширению право «${perm}»`);
+    return row;
+  }
+
+  static checkCollection(c) {
+    if (!/^[a-z][a-z0-9_]{0,31}$/.test(String(c))) throw new Error('400: Некорректное имя коллекции');
+    return String(c);
+  }
+
+  static checkKey(k) {
+    if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(String(k))) throw new Error('400: Некорректный ключ');
+    return String(k);
+  }
+
+  static async dataList(projectId, extensionId, collection) {
+    await this.dataGate(projectId, extensionId, 'data:read');
+    const res = await pool.query(
+      'SELECT key, value FROM extension_data WHERE project_id = $1 AND extension_id = $2 AND collection = $3 ORDER BY key LIMIT 5000;',
+      [projectId, extensionId, this.checkCollection(collection)]
+    );
+    return res.rows;
+  }
+
+  static async dataSet(projectId, extensionId, userId, collection, key, value) {
+    await this.dataGate(projectId, extensionId, 'data:write');
+    const json = JSON.stringify(value ?? null);
+    if (json === undefined || Buffer.byteLength(json) > 16 * 1024) throw new Error('400: Значение больше 16 КБ');
+    const c = this.checkCollection(collection);
+    const k = this.checkKey(key);
+    const cnt = await pool.query('SELECT count(*)::int AS n FROM extension_data WHERE project_id = $1 AND extension_id = $2;', [projectId, extensionId]);
+    const exists = await pool.query('SELECT 1 FROM extension_data WHERE project_id = $1 AND extension_id = $2 AND collection = $3 AND key = $4;', [projectId, extensionId, c, k]);
+    if (exists.rowCount === 0 && cnt.rows[0].n >= 5000) throw new Error('400: Достигнут предел хранилища расширения (5000 записей)');
+    await pool.query(
+      `INSERT INTO extension_data (project_id, extension_id, collection, key, value, updated_by)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+       ON CONFLICT (project_id, extension_id, collection, key)
+       DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now();`,
+      [projectId, extensionId, c, k, json, userId]
+    );
+  }
+
+  static async dataRemove(projectId, extensionId, collection, key) {
+    await this.dataGate(projectId, extensionId, 'data:write');
+    await pool.query('DELETE FROM extension_data WHERE project_id = $1 AND extension_id = $2 AND collection = $3 AND key = $4;', [
+      projectId, extensionId, this.checkCollection(collection), this.checkKey(key),
+    ]);
   }
 
   // ------------------------------------------------------------ журнал вызовов

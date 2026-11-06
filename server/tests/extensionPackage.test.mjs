@@ -106,3 +106,15 @@ test('eval/fetch в JS — только предупреждение', async () 
   assert.equal(r.ok, true, r.errors.join('; '));
   assert.ok(r.warnings.length > 0);
 });
+
+test('пример task-dependencies проходит и объявляет страж', async () => {
+  const r = await analyzePackage(fs.readFileSync(new URL('../../extensions/examples/task-dependencies.zip', import.meta.url)));
+  assert.equal(r.ok, true, r.errors.join('; '));
+  assert.equal(r.manifest.guards[0].type, 'task-blocked-by');
+});
+test('guards: неизвестный тип и отсутствие права guard:task-status', async () => {
+  const g = { type: 'task-blocked-by', collection: 'deps', field: 'blockedBy', statuses: [1, 2] };
+  await bad('no-perm', [{ name: 'manifest.json', data: manifest({ guards: [g] }) }, ...base().slice(1)], /guard:task-status/);
+  await bad('type', [{ name: 'manifest.json', data: manifest({ permissions: ['ui:view', 'guard:task-status', 'data:write'], guards: [{ ...g, type: 'exec' }] }) }, ...base().slice(1)]);
+  await bad('status', [{ name: 'manifest.json', data: manifest({ permissions: ['ui:view', 'guard:task-status', 'data:write'], guards: [{ ...g, statuses: [99] }] }) }, ...base().slice(1)]);
+});

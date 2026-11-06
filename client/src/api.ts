@@ -586,6 +586,12 @@ const extensions = {
     request<unknown>('DELETE', `/api/extensions/projects/${projectId}/${extensionId}`),
   audit: (projectId: number, extensionId: number) =>
     request<ExtAuditRow[]>('GET', `/api/extensions/projects/${projectId}/${extensionId}/audit`),
+  dataList: (projectId: number, extensionId: number, collection: string) =>
+    request<{ key: string; value: unknown }[]>('GET', `/api/extensions/projects/${projectId}/${extensionId}/data/${encodeURIComponent(collection)}`),
+  dataSet: (projectId: number, extensionId: number, collection: string, key: string, value: unknown) =>
+    request<unknown>('PUT', `/api/extensions/projects/${projectId}/${extensionId}/data/${encodeURIComponent(collection)}/${encodeURIComponent(key)}`, { value }),
+  dataRemove: (projectId: number, extensionId: number, collection: string, key: string) =>
+    request<unknown>('DELETE', `/api/extensions/projects/${projectId}/${extensionId}/data/${encodeURIComponent(collection)}/${encodeURIComponent(key)}`),
   recordAudit: (projectId: number, extensionId: number, entries: { method: string; ok: boolean }[]) =>
     request<unknown>('POST', `/api/extensions/projects/${projectId}/${extensionId}/audit`, { entries }),
 };

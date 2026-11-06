@@ -227,6 +227,39 @@ router.post('/extensions/projects/:projectId/:extensionId/audit', authMiddleware
   res.status(204).end();
 }));
 
+/**
+ * @swagger
+ * /api/extensions/projects/{projectId}/{extensionId}/data/{collection}:
+ *   get:
+ *     summary: "Собственные данные расширения в проекте: список записей коллекции. Право READ + расширению выдано data:read"
+ *     tags: [Extensions]
+ *     security: [{ bearerAuth: [] }]
+ *     responses: { 200: { description: "[{key, value}]" } }
+ * /api/extensions/projects/{projectId}/{extensionId}/data/{collection}/{key}:
+ *   put:
+ *     summary: "Записать значение {value} (до 16 КБ). Право EXECUTE + расширению выдано data:write"
+ *     tags: [Extensions]
+ *     security: [{ bearerAuth: [] }]
+ *     responses: { 204: { description: Записано } }
+ *   delete:
+ *     summary: "Удалить запись. Право EXECUTE + data:write"
+ *     tags: [Extensions]
+ *     security: [{ bearerAuth: [] }]
+ *     responses: { 204: { description: Удалено } }
+ */
+const D = '/extensions/projects/:projectId/:extensionId/data/:collection';
+router.get(D, authMiddleware, checkProjectAccess('READ'), wrap(async (req, res) => {
+  res.json(await ExtensionRepository.dataList(req.projectId, id(req.params.extensionId), req.params.collection));
+}));
+router.put(`${D}/:key`, authMiddleware, checkProjectAccess('EXECUTE'), wrap(async (req, res) => {
+  await ExtensionRepository.dataSet(req.projectId, id(req.params.extensionId), req.user.id, req.params.collection, req.params.key, req.body?.value);
+  res.status(204).end();
+}));
+router.delete(`${D}/:key`, authMiddleware, checkProjectAccess('EXECUTE'), wrap(async (req, res) => {
+  await ExtensionRepository.dataRemove(req.projectId, id(req.params.extensionId), req.params.collection, req.params.key);
+  res.status(204).end();
+}));
+
 // ------------------------------------------------------------------ модерация
 /**
  * @swagger

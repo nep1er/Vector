@@ -59,6 +59,9 @@
 | `kanban:write` | `kanban.moveCard` |
 | `members:read` | `members.list` |
 | `storage:read` | `storage.list` (названия, без содержимого файлов) |
+| `data:read` | `data.list` — чтение собственных данных расширения в проекте |
+| `data:write` | `data.set`, `data.remove` — запись собственных данных (на сервере только право EXECUTE, т. е. руководителям) |
+| `guard:task-status` | включает «стражей» из манифеста (см. ниже) |
 | `ui:view` | страницы проекта |
 | `ui:task-panel` | панель в окне задачи, `ui.resize` |
 
@@ -77,6 +80,9 @@ vector.tasks.updateDates(id, '2026-11-01', '2026-11-10');
 vector.tasks.setStatus(id, statusId);
 vector.kanban.board(todoId);           // колонки с карточками
 vector.kanban.moveCard(cardId, columnId, index);
+vector.data.list('deps');              // [{key, value}] — коллекция a-z0-9_, ключ до 64 симв., значение до 16 КБ, до 5000 записей
+vector.data.set('deps', '42', {blockedBy: [7]});
+vector.data.remove('deps', '42');
 vector.members.list();                 // [{user_id,username,avatar_url,roles[]}]
 vector.storage.list();                 // [{id,name,files:[{id,name}]}]
 vector.ui.resize(height);              // панель в задаче, 80–600 px
@@ -86,6 +92,18 @@ vector.onTheme(function (t) {});       // 'light' | 'dark' (атрибут data-
 Ошибки приходят как `Error` с `code`: `DENIED` (нет права/чужой id), `RATE_LIMIT` (более 40 вызовов за 10 с), `UNKNOWN`, `ERROR`.
 
 Готовый пример — `extensions/examples/task-timeline/` (и собранный `task-timeline.zip`).
+
+## Стражи (guards): расширение вмешивается в логику ядра
+
+Расширение **не выполняет код на сервере**, но может объявить в манифесте декларативное правило, которое ядро применяет само:
+
+```json
+"guards": [{ "type": "task-blocked-by", "collection": "deps", "field": "blockedBy", "statuses": [1, 2], "cards": true }]
+```
+
+Для `task-blocked-by` ядро перед сменой статуса задачи на один из `statuses` (1 «Выполнено», 2 «В процессе» …) читает запись `deps/<id задачи>` из собственных данных расширения, берёт список id из поля `blockedBy` и, если среди этих задач есть невыполненные, отвечает ошибкой 409: «Нельзя начать работу: сначала завершите задачу «…»». При `cards: true` то же правило действует для карточек Канбана ToDo-задачи: нельзя завершить карточку или перенести её из первой колонки. Правило работает, только если расширение установлено, включено, одобрено, автор не забанен и проект выдал право `guard:task-status`. Нужны также `data:write` и (для UI) `tasks:read`. Основные таблицы расширению недоступны — только `extension_data`.
+
+Пример — `extensions/examples/task-dependencies/` («Менеджер зависимостей задач»).
 
 ## Безопасность
 

@@ -1,0 +1,26 @@
+:root { --bg: #fbf7f1; --fg: #2b241d; --muted: #8a7d70; --line: #e3d9cc; --accent: #3b82f6; --ok: #2f9e5b; --bad: #c0392b; --warn: #d9a21b; --field: #fff; }
+:root[data-theme='dark'] { --bg: #1e1a16; --fg: #efe7dc; --muted: #9a8d80; --line: #3a322a; --accent: #5b9bff; --ok: #4cc07f; --bad: #ef6a5b; --warn: #e3b341; --field: #2a2520; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 13px system-ui, sans-serif; }
+body { padding: 8px 10px; }
+h1 { font-size: 16px; margin: 4px 0 10px; }
+h2 { font-size: 12px; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.muted { color: var(--muted); }
+.err { color: var(--bad); margin: 6px 0; }
+ul.tree { list-style: none; margin: 0; padding: 0; }
+ul.tree ul { list-style: none; margin: 0 0 0 14px; padding-left: 8px; border-left: 1px solid var(--line); }
+.node { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--warn); }
+.dot.done { background: var(--ok); }
+.dot.todo { background: var(--bad); }
+.node .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button { font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--fg); padding: 2px 8px; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.x { border: 0; background: transparent; color: var(--muted); padding: 0 4px; }
+button.x:hover { color: var(--bad); }
+select { font: inherit; background: var(--field); color: var(--fg); border: 1px solid var(--line); padding: 3px; max-width: 100%; }
+.add { display: flex; gap: 6px; margin-top: 6px; }
+.add select { flex: 1; min-width: 0; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.badge { display: inline-block; padding: 0 6px; border: 1px solid var(--line); font-size: 11px; }
+.badge.blocked { border-color: var(--bad); color: var(--bad); }

@@ -40,15 +40,15 @@ interface Props {
 }
 
 const DEMO_TASKS = [
-  { id: 1, type: 'ROADMAP', title: 'Подготовка', description: null, start_date: '2026-11-02', end_date: '2026-11-13', parent_id: null, status_id: 3 },
+  { id: 1, type: 'ROADMAP', title: 'Подготовка', description: null, start_date: '2026-11-02', end_date: '2026-11-13', parent_id: null, status_id: 1 },
   { id: 2, type: 'ROADMAP', title: 'Разработка', description: null, start_date: '2026-11-09', end_date: '2026-12-04', parent_id: null, status_id: 2 },
-  { id: 3, type: 'TODO', title: 'Макеты экранов', description: null, start_date: '2026-11-03', end_date: '2026-11-10', parent_id: 1, status_id: 5 },
+  { id: 3, type: 'TODO', title: 'Макеты экранов', description: null, start_date: '2026-11-03', end_date: '2026-11-10', parent_id: 1, status_id: 3 },
   { id: 4, type: 'TODO', title: 'API и база данных', description: null, start_date: '2026-11-10', end_date: '2026-11-27', parent_id: 2, status_id: 2 },
   { id: 5, type: 'ROADMAP', title: 'Релиз', description: null, start_date: '2026-12-01', end_date: '2026-12-18', parent_id: null, status_id: 1 },
 ];
 const DEMO_STATUSES = [
-  { id: 1, name: 'Не начато' }, { id: 2, name: 'В процессе' }, { id: 3, name: 'Выполнено' },
-  { id: 4, name: 'Отложено' }, { id: 5, name: 'На проверке' }, { id: 6, name: 'Заблокировано' },
+  { id: 1, name: 'Выполнено' }, { id: 2, name: 'В процессе' }, { id: 3, name: 'В плане' },
+  { id: 4, name: 'Просрочено' }, { id: 5, name: 'Заморожено' }, { id: 6, name: 'Неактивно' },
 ];
 const DEMO_MEMBERS = [
   { user_id: 1, username: 'Анна', avatar_url: null, roles: ['Руководитель'] },
@@ -87,6 +87,7 @@ export default function ExtensionFrame(p: Props) {
     const calls: number[] = [];
     const auditQueue: { method: string; ok: boolean }[] = [];
     let tasksLoaded: Promise<void> | null = null;
+    const demoData = new Map<string, Map<string, unknown>>();
 
     const loadTasks = () =>
       (tasksLoaded ??= (async () => {
@@ -165,6 +166,26 @@ export default function ExtensionFrame(p: Props) {
         return (await api.storage.list(p.projectId!)).map((s) => ({
           id: s.id, name: s.name, files: s.files.map((f) => ({ id: f.id, name: f.name })),
         }));
+      },
+      'data.list': async (a) => {
+        const d = need('data:read'); if (d) return d;
+        if (typeof a?.collection !== 'string') return deny('Укажите collection');
+        if (p.demo) return [...(demoData.get(a.collection)?.entries() ?? [])].map(([key, value]) => ({ key, value }));
+        return api.extensions.dataList(p.projectId!, p.extensionId, a.collection);
+      },
+      'data.set': async (a) => {
+        const d = need('data:write'); if (d) return d;
+        if (typeof a?.collection !== 'string' || typeof a?.key !== 'string') return deny('Укажите collection и key');
+        if (p.demo) { if (!demoData.has(a.collection)) demoData.set(a.collection, new Map()); demoData.get(a.collection)!.set(a.key, a.value); return { ok: true }; }
+        await api.extensions.dataSet(p.projectId!, p.extensionId, a.collection, a.key, a.value);
+        return { ok: true };
+      },
+      'data.remove': async (a) => {
+        const d = need('data:write'); if (d) return d;
+        if (typeof a?.collection !== 'string' || typeof a?.key !== 'string') return deny('Укажите collection и key');
+        if (p.demo) { demoData.get(a.collection)?.delete(a.key); return { ok: true }; }
+        await api.extensions.dataRemove(p.projectId!, p.extensionId, a.collection, a.key);
+        return { ok: true };
       },
       'ui.resize': async (a) => {
         if (!perms.has('ui:task-panel') && !perms.has('ui:view')) return deny('Нет права на интерфейс');

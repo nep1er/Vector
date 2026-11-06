@@ -32,7 +32,7 @@
     }
     dated.forEach(function (task, i) {
       var y = 30 + i * ROW;
-      var done = task.status_id === 3;
+      var done = task.status_id === 1;
       var x1 = LABEL + ((t(task.start_date) - min) / DAY) * scale;
       var w = Math.max(4, ((t(task.end_date) - t(task.start_date)) / DAY + 1) * scale);
       var indent = task.parent_id ? 12 : 0;

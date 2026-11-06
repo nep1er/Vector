@@ -1,0 +1,15 @@
+{
+  "apiVersion": 1,
+  "id": "task-dependencies",
+  "name": "Менеджер зависимостей задач",
+  "version": "1.0.0",
+  "description": "Связывает задачи: пока задача-предшественник не выполнена, зависимую нельзя начать или завершить (в RoadMap и в Канбане).",
+  "author": "Vector",
+  "icon": "icon.svg",
+  "permissions": ["tasks:read", "data:read", "data:write", "guard:task-status", "ui:task-panel", "ui:view"],
+  "views": [{ "id": "overview", "title": "Зависимости задач", "entry": "index.html" }],
+  "taskPanels": [{ "id": "deps", "title": "Зависимости", "entry": "panel.html", "height": 220 }],
+  "guards": [
+    { "type": "task-blocked-by", "collection": "deps", "field": "blockedBy", "statuses": [1, 2], "cards": true }
+  ]
+}

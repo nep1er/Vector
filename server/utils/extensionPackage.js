@@ -10,6 +10,9 @@ export const PERMISSIONS = {
   'kanban:write': 'Перемещать карточки между колонками',
   'members:read': 'Видеть участников проекта и их роли',
   'storage:read': 'Видеть список файлов и ссылок хранилища проекта',
+  'data:read': 'Читать собственные данные расширения в проекте',
+  'data:write': 'Хранить собственные данные расширения в проекте (от имени руководителя)',
+  'guard:task-status': 'Запрещать смену статуса задач и карточек по правилам расширения',
   'ui:view': 'Добавлять свою страницу (вкладку) в проект',
   'ui:task-panel': 'Добавлять свой блок в панель задачи',
 };
@@ -297,7 +300,7 @@ export function validateManifest(m, files) {
   const str = (v, max) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
   if (typeof m !== 'object' || m === null || Array.isArray(m)) return { errors: ['manifest.json должен быть объектом'], warnings, manifest: null };
 
-  const known = new Set(['apiVersion', 'id', 'name', 'version', 'description', 'author', 'icon', 'permissions', 'views', 'taskPanels']);
+  const known = new Set(['apiVersion', 'id', 'name', 'version', 'description', 'author', 'icon', 'permissions', 'views', 'taskPanels', 'guards']);
   for (const k of Object.keys(m)) if (!known.has(k)) warnings.push(`manifest.json: неизвестное поле «${k}» будет проигнорировано`);
 
   if (m.apiVersion !== 1) errors.push('manifest.json: apiVersion должен быть равен 1');
@@ -352,6 +355,25 @@ export function validateManifest(m, files) {
   const taskPanels = checkList('taskPanels', 3, 'ui:task-panel');
   if (views.length === 0 && taskPanels.length === 0) errors.push('manifest.json: расширение должно добавлять хотя бы одну страницу (views) или блок задачи (taskPanels)');
 
+  // Декларативные «стражи»: сервер сам применяет фиксированное правило, код расширения на сервере не выполняется
+  const guards = [];
+  if (m.guards !== undefined) {
+    if (!Array.isArray(m.guards) || m.guards.length > 3) errors.push('manifest.json: guards — массив не длиннее 3');
+    else {
+      for (const g of m.guards) {
+        const ok =
+          g && typeof g === 'object' && g.type === 'task-blocked-by' &&
+          /^[a-z][a-z0-9_]{0,31}$/.test(String(g.collection ?? '')) && /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(String(g.field ?? '')) &&
+          Array.isArray(g.statuses) && g.statuses.length >= 1 && g.statuses.length <= 6 &&
+          g.statuses.every((x) => Number.isInteger(x) && x >= 1 && x <= 6) && new Set(g.statuses).size === g.statuses.length;
+        if (!ok) errors.push('manifest.json: guards — {type:"task-blocked-by", collection, field, statuses:[1..6], cards?:boolean}');
+        else guards.push({ type: g.type, collection: g.collection, field: g.field, statuses: g.statuses, cards: g.cards === true });
+      }
+      if (guards.length && permissions && !permissions.includes('guard:task-status')) errors.push('manifest.json: для guards нужно право «guard:task-status»');
+      if (guards.length && permissions && !permissions.includes('data:write')) errors.push('manifest.json: для guards нужно право «data:write» (правила читают данные расширения)');
+    }
+  }
+
   const manifest = {
     apiVersion: 1,
     id: m.id,
@@ -363,6 +385,7 @@ export function validateManifest(m, files) {
     permissions: Array.isArray(permissions) ? permissions : [],
     views,
     taskPanels,
+    guards,
   };
   return { errors, warnings, manifest };
 }

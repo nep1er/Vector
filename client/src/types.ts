@@ -339,6 +339,9 @@ export type ExtPermission =
   | 'kanban:write'
   | 'members:read'
   | 'storage:read'
+  | 'data:read'
+  | 'data:write'
+  | 'guard:task-status'
   | 'ui:view'
   | 'ui:task-panel';
 
@@ -353,6 +356,7 @@ export interface ExtManifest {
   permissions: ExtPermission[];
   views: { id: string; title: string; entry: string }[];
   taskPanels: { id: string; title: string; entry: string; height?: number }[];
+  guards?: { type: 'task-blocked-by'; collection: string; field: string; statuses: number[]; cards: boolean }[];
 }
 
 export type PlatformRole = 'ADMIN' | 'MODERATOR' | null;

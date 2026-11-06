@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { RoadmapRepository } from '../db/RoadmapRepository.js';
 import { TodoRepository } from '../db/TodoRepository.js';
 import { TaskVisibilityRepository } from '../db/TaskVisibilityRepository.js';
+import { ExtensionGuardRepository } from '../db/ExtensionGuardRepository.js';
 import { TaskRepository } from '../db/TaskRepository.js';
 import { UserRepository } from '../db/UserRepository.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
@@ -351,6 +352,9 @@ router.get('/statuses', authMiddleware, async (req, res) => {
  */
 router.patch('/:taskId/status', authMiddleware, checkTaskAccess('EXECUTE'), async (req, res) => {
   try {
+    // «Стражи» расширений (например, зависимости задач) могут запретить смену статуса
+    const current = await TaskRepository.findById(Number(req.params.taskId));
+    if (current) await ExtensionGuardRepository.checkTaskStatus(current, req.body.statusId);
     const updated = await TaskRepository.updateStatus(req.params.taskId, req.body.statusId);
     if (!updated) return res.status(404).json({ message: 'Задача не найдена' });
     // Уведомление — побочный эффект: его сбой не должен отменять смену статуса

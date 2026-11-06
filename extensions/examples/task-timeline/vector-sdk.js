@@ -67,6 +67,12 @@
       board: function (todoId) { return call('kanban.board', { todoId: todoId }); },
       moveCard: function (cardId, columnId, index) { return call('kanban.moveCard', { cardId: cardId, columnId: columnId, index: index }); }
     },
+    /** Собственное хранилище расширения в проекте (права data:read / data:write; запись — только руководителям) */
+    data: {
+      list: function (collection) { return call('data.list', { collection: collection }); },
+      set: function (collection, key, value) { return call('data.set', { collection: collection, key: key, value: value }); },
+      remove: function (collection, key) { return call('data.remove', { collection: collection, key: key }); }
+    },
     members: { list: function () { return call('members.list'); } },
     storage: { list: function () { return call('storage.list'); } },
     ui: { resize: function (height) { return call('ui.resize', { height: height }); } }

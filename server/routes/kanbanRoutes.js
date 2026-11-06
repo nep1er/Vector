@@ -1,4 +1,5 @@
 import express, { Router } from 'express';
+import { ExtensionGuardRepository } from '../db/ExtensionGuardRepository.js';
 import { KanbanRepository } from '../db/KanbanRepository.js';
 import { CommentRepository } from '../db/CommentRepository.js';
 import { FileRepository } from '../db/FileRepository.js';
@@ -204,6 +205,7 @@ router.patch(
   wrap('Ошибка перемещения карточки', async (req, res) => {
     const { targetColumnId, index, newStatusId } = req.body ?? {};
     if (!Number.isInteger(Number(targetColumnId))) return res.status(400).json({ message: 'Укажите targetColumnId' });
+    await ExtensionGuardRepository.checkCard({ cardId: req.params.cardId, targetColumnId, completing: Number(newStatusId) === 1 });
     res.json(await KanbanRepository.moveCard(req.params.cardId, targetColumnId, index, newStatusId));
   })
 );
@@ -270,6 +272,7 @@ router.patch(
   authMiddleware,
   checkCardAccess('EXECUTE'),
   wrap('Ошибка смены статуса карточки', async (req, res) => {
+    await ExtensionGuardRepository.checkCard({ cardId: req.params.cardId, completing: Number(req.body?.cardStatusId) === 1 });
     res.json(await KanbanRepository.updateCardStatus(req.params.cardId, req.body?.cardStatusId));
   })
 );
