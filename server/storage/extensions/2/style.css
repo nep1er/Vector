@@ -1,0 +1,42 @@
+/* Цвета и скругления приходят от Vector (--v-*), значения после «,» — запасные */
+:root {
+  --bg: var(--v-bg, #fbf7f1); --surface: var(--v-surface, #fff); --surface2: var(--v-surface2, #f1ebe2);
+  --text: var(--v-text, #2b241d); --muted: var(--v-muted, #7b6f63); --border: var(--v-border, #e3d9cc);
+  --accent: var(--v-accent, #3b82f6); --on-accent: var(--v-on-accent, #fff);
+  --danger: var(--v-danger, #c0392b); --ok: var(--v-success, #2f9e5b); --radius: var(--v-radius, 6px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; color: var(--text); font: 14px/1.4 var(--v-font, system-ui, sans-serif); }
+body { padding: 0; }
+body.page { background: var(--bg); padding: 20px; }
+h1 { font-size: 20px; margin: 0 0 16px; }
+.muted { color: var(--muted); }
+.err { color: var(--danger); margin-top: 8px; }
+
+.group { margin-bottom: 14px; }
+.group-title { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface2); border-radius: var(--radius); }
+.row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.row.child { margin-left: 18px; background: transparent; border: 1px dashed var(--border); }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; font-weight: 500; }
+.chip.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.chip.wait { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.icon-btn { border: 0; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; padding: 4px 6px; cursor: pointer; border-radius: var(--radius); }
+.icon-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+.banner { display: flex; gap: 8px; align-items: center; padding: 9px 12px; border-radius: var(--radius); font-size: 13px; font-weight: 500; margin-bottom: 14px; }
+.banner.blocked { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.banner.free { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+
+.add { display: flex; gap: 8px; }
+select { flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--v-input, var(--surface)); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; }
+button.primary { font: inherit; font-weight: 600; background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--radius); padding: 8px 14px; cursor: pointer; }
+button.primary:hover { filter: brightness(1.1); }
+
+table { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 0 12px; }
+td { padding: 10px 12px; background: var(--surface); vertical-align: middle; }
+td:first-child { border-radius: var(--radius) 0 0 var(--radius); font-weight: 600; }
+td:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.deps-cell > div { margin: 2px 0; }

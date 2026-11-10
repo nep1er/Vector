@@ -11,6 +11,7 @@
   var fmt = function (s) { return s ? s.split('-').reverse().join('.') : '—'; };
 
   vector.ready(function (ctx) {
+    vector.ui.autoResize();
     vector.tasks.list().then(function (tasks) {
       var out = document.getElementById('out');
       out.textContent = '';
@@ -22,7 +23,7 @@
       out.appendChild(row('Окончание', fmt(me.end_date)));
       out.appendChild(row('Осталось дней', left == null ? '—' : String(left)));
       out.appendChild(row('Вложенных задач', String(kids.length)));
-      vector.ui.resize(out.scrollHeight + 14);
+      
     }).catch(function (e) {
       document.getElementById('out').textContent = 'Ошибка: ' + e.message;
     });

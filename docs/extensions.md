@@ -86,8 +86,11 @@ vector.data.remove('deps', '42');
 vector.members.list();                 // [{user_id,username,avatar_url,roles[]}]
 vector.storage.list();                 // [{id,name,files:[{id,name}]}]
 vector.ui.resize(height);              // панель в задаче, 80–600 px
+vector.ui.autoResize();                // панель сама подстраивает высоту (body без внешних отступов)
 vector.onTheme(function (t) {});       // 'light' | 'dark' (атрибут data-theme ставится на <html> автоматически)
 ```
+
+Цвета приложения доступны как CSS-переменные `--v-bg`, `--v-surface`, `--v-surface2`, `--v-text`, `--v-muted`, `--v-border`, `--v-accent`, `--v-on-accent`, `--v-danger`, `--v-success`, `--v-input`, `--v-radius`, `--v-font` — расширение совпадает с любой темой Vector (см. `style.css` в примерах).
 
 Ошибки приходят как `Error` с `code`: `DENIED` (нет права/чужой id), `RATE_LIMIT` (более 40 вызовов за 10 с), `UNKNOWN`, `ERROR`.
 

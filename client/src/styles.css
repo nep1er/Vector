@@ -591,7 +591,7 @@ a.tile:focus-visible::after {
   min-height: 0;
 }
 .roadmap-layout.has-inspector {
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 460px);
 }
 .inspector {
   overflow-y: auto;
@@ -2512,61 +2512,87 @@ select {
 .color-custom input { width: 48px; height: 30px; padding: 0; border: 0; background: none; }
 
 /* ===================== Расширения ===================== */
-.btn-sm { padding: 4px 10px; font-size: 13px; }
-.badge-warn { background: color-mix(in srgb, #d9a21b 22%, transparent); color: #b8860b; }
-.ext-st-approved { background: color-mix(in srgb, #2f9e5b 20%, transparent); color: #2f9e5b; }
-.ext-st-pending { background: color-mix(in srgb, #d9a21b 22%, transparent); color: #b8860b; }
+.btn-sm { padding: 5px 12px; font-size: 13px; }
+.badge-warn { background: color-mix(in srgb, #d9a21b 22%, transparent); color: #d9a21b; }
+.ext-st-approved { background: var(--color-success-soft); color: var(--color-success); }
+.ext-st-pending { background: color-mix(in srgb, #d9a21b 22%, transparent); color: #d9a21b; }
 .ext-st-rejected { background: var(--color-danger-soft); color: var(--color-danger); }
-.ext-panel { margin-top: 12px; }
-.ext-toolbar { display: flex; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.ext-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
-.ext-card { border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--color-surface); }
-.ext-card header { display: flex; gap: 10px; align-items: center; }
+.ext-panel { margin-top: 14px; padding: 20px; }
+.ext-toolbar { display: flex; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.ext-toolbar p { margin: 0; }
+.ext-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; }
+.ext-card { border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--color-surface-2); transition: border-color .15s; }
+.ext-card:hover { border-color: var(--color-accent); }
+.ext-card header { display: flex; gap: 12px; align-items: center; }
 .ext-card header > div { display: flex; flex-direction: column; min-width: 0; }
-.ext-card p { margin: 0; flex: 1; font-size: 14px; }
-.ext-card footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.ext-ico { width: 36px; height: 36px; display: grid; place-items: center; background: var(--color-surface-2); border-radius: var(--radius-md); color: var(--color-accent); flex: none; }
-.ext-name { font-weight: 600; font-size: 15px; text-align: left; }
-.ext-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
-.ext-h { margin: 16px 0 6px; font-size: 15px; }
+.ext-card p { margin: 0; flex: 1; font-size: 14px; line-height: 1.45; color: var(--color-text-muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ext-card footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 4px; }
+.ext-ico { width: 44px; height: 44px; display: grid; place-items: center; background: var(--color-accent-soft); border-radius: var(--radius-lg); color: var(--color-accent-text); flex: none; }
+.ext-name { font-weight: 600; font-size: 16px; text-align: left; }
+.ext-lead { font-size: 15px; line-height: 1.5; margin: 0 0 12px; }
+.ext-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.ext-pill { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.ext-h { margin: 20px 0 8px; font-size: 15px; font-weight: 600; }
 .ext-versions { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-.ext-versions li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ext-versions li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; background: var(--color-surface-2); border-radius: var(--radius-md); }
 .ext-report { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; }
 .ext-report textarea { flex: 1; }
 .ext-mine { display: flex; flex-direction: column; gap: 12px; }
-.ext-mine-item header { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.ext-mine-item header { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .ext-mine-item header .btn { margin-left: auto; }
 .ext-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
-.ext-table th, .ext-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--color-border-strong); vertical-align: top; }
+.ext-table th { text-align: left; padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border-strong); }
+.ext-table td { padding: 10px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
 .ext-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ext-reports { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .ext-review { display: grid; grid-template-columns: 220px 1fr; gap: 12px; margin: 12px 0; }
-.ext-files { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; border: 1px solid var(--color-border-strong); padding: 6px; font-size: 13px; }
+.ext-files { list-style: none; margin: 0; padding: 6px; max-height: 320px; overflow: auto; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-size: 13px; }
 .ext-files .link-btn.active { font-weight: 700; }
-.ext-code { margin: 0; max-height: 320px; overflow: auto; background: var(--color-surface-2); border: 1px solid var(--color-border-strong); padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-.seg { margin-bottom: 4px; }
-.perm-list { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
-.perm { border: 1px solid var(--color-border-strong); padding: 8px 10px; border-radius: var(--radius-md); }
-.perm label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
-.perm-text { flex: 1; display: flex; flex-direction: column; }
-.perm-new { border-color: #d9a21b; background: color-mix(in srgb, #d9a21b 10%, transparent); }
-.perm-flag { font-style: normal; color: #b8860b; font-size: 12px; }
-.perm-risk { font-size: 12px; white-space: nowrap; }
-.perm-risk-low { color: #2f9e5b; } .perm-risk-mid { color: #b8860b; } .perm-risk-high { color: var(--color-danger); }
-.ext-installed { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 8px; }
-.ext-installed-head { display: flex; gap: 10px; align-items: center; }
-.ext-state { display: flex; gap: 6px; margin-top: 2px; }
+.ext-code { margin: 0; max-height: 320px; overflow: auto; background: var(--color-input); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+
+/* права */
+.perm-list { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 8px; }
+.perm { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-2); }
+.perm-row { display: flex; gap: 12px; align-items: center; padding: 10px 14px; cursor: pointer; margin: 0; }
+div.perm-row { cursor: default; }
+.perm-row input[type='checkbox'] { width: 18px; height: 18px; padding: 0; flex: none; accent-color: var(--color-accent); }
+.perm-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--color-success); }
+.perm-mid .perm-dot { background: #d9a21b; } .perm-high .perm-dot { background: var(--color-danger); }
+.perm-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.perm-text b { font-size: 14px; font-weight: 600; }
+.perm-text small { font-size: 13px; line-height: 1.35; color: var(--color-text-muted); }
+.perm-on { border-color: var(--color-accent); }
+.perm-new { border-color: #d9a21b; background: color-mix(in srgb, #d9a21b 12%, transparent); }
+.perm-flag { font-style: normal; font-weight: 600; font-size: 11px; margin-left: 8px; padding: 1px 6px; border-radius: 999px; background: #d9a21b; color: #1a1208; }
+.perm-risk { font-size: 12px; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+.perm-risk-low { background: var(--color-success-soft); color: var(--color-success); }
+.perm-risk-mid { background: color-mix(in srgb, #d9a21b 20%, transparent); color: #d9a21b; }
+.perm-risk-high { background: var(--color-danger-soft); color: var(--color-danger); }
+
+/* подключённые расширения в проекте */
+.ext-installed { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
+.ext-installed > li { padding: 14px; }
+.ext-installed-head { display: flex; gap: 12px; align-items: center; }
+.ext-state { display: flex; gap: 6px; margin-top: 4px; }
+.ext-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.ext-chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.ext-chip-high { border-color: var(--color-danger); color: var(--color-danger); }
 .ext-lib-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .ext-lib-row p { margin: 2px 0 0; }
-.ext-frame { width: 100%; height: calc(100vh - 140px); min-height: 360px; border: 1px solid var(--color-border-strong); background: var(--color-bg); display: block; }
+
+/* запуск расширений */
+.ext-frame { width: 100%; height: calc(100vh - 140px); min-height: 360px; border: 0; background: transparent; display: block; color-scheme: normal; }
 .ext-frame-panel { height: 160px; min-height: 0; }
-.ext-demo .ext-frame { height: 60vh; }
+.ext-demo .ext-frame { height: 60vh; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); }
 .ext-page { padding: 12px 16px; }
 .ext-page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.ext-panels { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
-.ext-panel-box h4 { margin: 0 0 4px; font-size: 13px; }
-.ext-menu { display: flex; flex-direction: column; gap: 4px; min-width: 220px; padding: 6px; }
-.ext-menu-link { display: flex; flex-direction: column; padding: 6px 8px; color: inherit; text-decoration: none; border-radius: var(--radius-sm); }
+.ext-panels { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+.ext-panel-box { border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-surface-2); padding: 14px 16px 16px; }
+.ext-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.ext-panel-head h4 { margin: 0; font-size: 16px; font-weight: 600; }
+.ext-panel-head small { font-size: 12px; color: var(--color-text-faint); }
+.ext-menu { display: flex; flex-direction: column; gap: 4px; min-width: 240px; padding: 8px; }
+.ext-menu-link { display: flex; flex-direction: column; padding: 8px 10px; color: inherit; text-decoration: none; border-radius: var(--radius-md); }
 .ext-menu-link:hover { background: var(--color-hover); }
 .ext-validation ul { margin: 6px 0 0 18px; padding: 0; }
 .ext-manifest { margin-top: 10px; }

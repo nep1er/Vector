@@ -70,28 +70,30 @@ export default function ExtensionDetailsModal({ extensionId, me, onClose, onChan
 
   return (
     <Modal title={d.name} onClose={onClose} wide>
+      <p className="ext-lead">{d.summary}</p>
       <div className="ext-meta">
-        <span>Автор: <b>{d.author_name}</b>{d.author_banned && <span className="badge badge-warn"> заблокирован</span>}</span>
-        <span>В библиотеках: {d.library_count}</span>
+        <span className="ext-pill">Автор: {d.author_name}</span>
+        {approved && <span className="ext-pill">v{approved.version}</span>}
+        <span className="ext-pill">Установок: {d.library_count}</span>
+        {d.author_banned && <span className="badge badge-warn">автор заблокирован</span>}
         {d.status === 'REMOVED' && <span className="badge badge-warn">Удалено: {d.removed_reason}</span>}
       </div>
-      <p>{d.summary}</p>
       {error && <div className="notice notice-err">{error}</div>}
 
       {approved && (
         <>
-          <h3 className="ext-h">Какие права запрашивает ({approved.version})</h3>
+          <h3 className="ext-h">Что потребуется расширению</h3>
           <PermissionPicker asked={approved.manifest.permissions} value={approved.manifest.permissions} readOnly />
         </>
       )}
 
-      <h3 className="ext-h">Версии</h3>
+      <h3 className="ext-h">История версий</h3>
       <ul className="ext-versions">
         {d.versions.map((v) => (
           <li key={v.id}>
             <b>{v.version}</b>
             <span className={`badge ext-st-${v.status.toLowerCase()}`}>{STATUS_LABEL[v.status]}</span>
-            <span className="muted">{fmtSize(v.size_bytes)} · {v.file_count} файлов</span>
+            <span className="muted">{fmtSize(v.size_bytes)}</span>
             {v.review_note && <span className="muted">— {v.review_note}</span>}
             {canPreview && v.manifest.views[0] && (
               <button className="btn btn-quiet btn-sm" onClick={() => startDemo(v.id, v.manifest.views[0].entry, v.manifest.views[0].id, v.manifest.views[0].title)}>Демо</button>

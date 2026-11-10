@@ -18,8 +18,9 @@ export default function TaskExtensionPanels({ projectId, taskId }: { projectId: 
           const key = `${x.id}-${pn.id}`;
           return (
             <section key={key} className="ext-panel-box">
-              <h4>{pn.title} <small className="muted">· {x.name}</small></h4>
+              <header className="ext-panel-head"><h4>{pn.title}</h4><small>{x.name}</small></header>
               <ExtensionFrame
+                key={`${key}-${taskId}`}
                 panel
                 src={extFileUrl(x.version_id, pn.entry)}
                 title={pn.title}

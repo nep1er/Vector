@@ -52,7 +52,7 @@ export default function CatalogTab({ onOpen, refreshKey, onChanged }: Props) {
           {items.map((e) => (
             <article key={e.id} className="ext-card">
               <header>
-                <span className="ext-ico"><Icon name="puzzle" size={22} /></span>
+                <span className="ext-ico"><Icon name="puzzle" size={24} /></span>
                 <div>
                   <button className="link-btn ext-name" onClick={() => onOpen(e.id)}>{e.name}</button>
                   <small className="muted">v{e.version} · {e.author_name}</small>
@@ -60,7 +60,7 @@ export default function CatalogTab({ onOpen, refreshKey, onChanged }: Props) {
               </header>
               <p>{e.summary}</p>
               <footer>
-                <small className="muted">{e.library_count} в библиотеках · прав: {e.manifest.permissions.length}</small>
+                <small className="muted">{e.library_count > 0 ? `Установок: ${e.library_count}` : 'Новое'}</small>
                 <button className={e.in_library ? 'btn btn-quiet' : 'btn btn-primary'} onClick={() => toggle(e)}>
                   {e.in_library ? 'В библиотеке ✓' : 'Добавить'}
                 </button>

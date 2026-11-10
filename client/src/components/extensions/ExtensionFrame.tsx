@@ -17,6 +17,18 @@ import type { ExtPermission, KanbanColumn, TaskNode } from '../../types';
  *  - каждое обращение к данным пишется в журнал проекта.
  */
 
+/** Цвета текущей темы приложения — передаются расширению, чтобы оно выглядело как часть Vector */
+function readColors(): Record<string, string> {
+  const cs = getComputedStyle(document.documentElement);
+  const g = (n: string) => cs.getPropertyValue(n).trim();
+  return {
+    bg: g('--color-bg'), surface: g('--color-surface'), surface2: g('--color-surface-2'), text: g('--color-text'),
+    muted: g('--color-text-muted'), border: g('--color-border-strong'), accent: g('--color-accent'),
+    'on-accent': g('--color-on-accent'), danger: g('--color-danger'), success: g('--color-success'), input: g('--color-input'),
+    radius: g('--radius-md'), font: g('--font-family'),
+  };
+}
+
 const RATE_LIMIT = 40; // вызовов
 const RATE_WINDOW_MS = 10_000;
 
@@ -208,7 +220,7 @@ export default function ExtensionFrame(p: Props) {
     const context = () => ({
       projectId: p.projectId ?? null, viewId: p.viewId ?? null, demo: !!p.demo,
       user: user ? { id: user.id, username: user.username } : null,
-      theme: theme, permissions: p.permissions, ...(p.context ?? {}),
+      theme: theme, colors: readColors(), permissions: p.permissions, ...(p.context ?? {}),
     });
 
     const onMessage = async (ev: MessageEvent) => {
@@ -247,7 +259,8 @@ export default function ExtensionFrame(p: Props) {
 
   // смена темы приложения — сообщаем расширению
   useEffect(() => {
-    ref.current?.contentWindow?.postMessage({ vector: 1, event: 'theme', theme }, '*');
+    const t = window.setTimeout(() => ref.current?.contentWindow?.postMessage({ vector: 1, event: 'theme', theme, colors: readColors() }, '*'), 60);
+    return () => window.clearTimeout(t);
   }, [theme]);
 
   return (

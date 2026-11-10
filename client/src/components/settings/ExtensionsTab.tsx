@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api';
 import type { ExtAuditRow, ExtPermission, LibraryExtension, ProjectExtension } from '../../types';
-import { UNUSABLE_LABEL } from '../../utils/extensions';
+import { PERMISSION_INFO, UNUSABLE_LABEL } from '../../utils/extensions';
 import PermissionPicker from '../extensions/PermissionPicker';
 import Icon from '../Icon';
 
@@ -133,7 +133,10 @@ export default function ExtensionsTab({ projectId, onChanged }: { projectId: num
                   </div>
                 </div>
               </div>
-              <p className="muted">Права: {x.granted_permissions.length ? x.granted_permissions.join(', ') : 'не выданы'}</p>
+              <div className="ext-chips">
+                {x.granted_permissions.length === 0 && <span className="muted">Права не выданы</span>}
+                {x.granted_permissions.map((p) => <span key={p} className={`ext-chip ext-chip-${PERMISSION_INFO[p].risk}`}>{PERMISSION_INFO[p].label}</span>)}
+              </div>
               <div className="ext-actions">
                 {x.update && <button className="btn btn-primary btn-sm" onClick={() => setMode({ kind: 'update', ext: x, granted: [] })}>Обновить</button>}
                 <button className="btn btn-quiet btn-sm" disabled={busy || !!x.unusable} onClick={() => run(() => api.extensions.patchInstall(projectId, x.extension_id, { enabled: !x.enabled }), false)}>{x.enabled ? 'Отключить' : 'Включить'}</button>

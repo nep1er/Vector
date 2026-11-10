@@ -12,8 +12,14 @@
   var readyCbs = [];
   var themeCbs = [];
 
-  function applyTheme(t) {
-    document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+  /* Цвета приложения приходят от Vector и доступны как CSS-переменные --v-bg, --v-surface, --v-surface2, --v-text,
+     --v-muted, --v-border, --v-accent, --v-on-accent, --v-danger, --v-success, --v-input, --v-radius, --v-font:
+     расширение автоматически совпадает с любой темой приложения. */
+  function applyTheme(t, colors) {
+    var root = document.documentElement;
+    root.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+    root.style.colorScheme = t === 'dark' ? 'dark' : 'light';
+    if (colors) for (var k in colors) root.style.setProperty('--v-' + k, colors[k]);
     themeCbs.forEach(function (cb) { cb(t); });
   }
 
@@ -22,11 +28,11 @@
     if (!m || m.vector !== 1 || e.source !== window.parent) return;
     if (m.event === 'ready') {
       ctx = m.context;
-      applyTheme(ctx.theme);
+      applyTheme(ctx.theme, ctx.colors);
       readyCbs.splice(0).forEach(function (cb) { cb(ctx); });
     } else if (m.event === 'theme') {
       if (ctx) ctx.theme = m.theme;
-      applyTheme(m.theme);
+      applyTheme(m.theme, m.colors);
     } else if (m.id != null && pending[m.id]) {
       var p = pending[m.id];
       delete pending[m.id];
@@ -75,7 +81,19 @@
     },
     members: { list: function () { return call('members.list'); } },
     storage: { list: function () { return call('storage.list'); } },
-    ui: { resize: function (height) { return call('ui.resize', { height: height }); } }
+    ui: {
+      resize: function (height) { return call('ui.resize', { height: height }); },
+      /** Панель в задаче: сама подстраивает высоту под содержимое (body должен быть без внешних отступов) */
+      autoResize: function () {
+        if (window.__vectorAuto || !window.ResizeObserver) return;
+        window.__vectorAuto = true;
+        var last = 0;
+        new ResizeObserver(function () {
+          var h = Math.ceil(document.body.getBoundingClientRect().height);
+          if (Math.abs(h - last) > 1) { last = h; call('ui.resize', { height: h }).catch(function () {}); }
+        }).observe(document.body);
+      }
+    }
   };
 
   window.parent.postMessage({ vector: 1, event: 'hello' }, '*');
