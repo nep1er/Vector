@@ -4,9 +4,9 @@ import type { ReactNode } from 'react';
 const PALETTES = [
   { from: '#b3262b', to: '#5e1418', a: '#f6ecdc', b: '#e48c84', ink: '#9d1f24', tile: '#fbf4e6' },
   { from: '#3a281b', to: '#241710', a: '#b3262b', b: '#7a5636', ink: '#2a1b11', tile: '#f6ecdc' },
-  { from: '#eadcc3', to: '#d6c3a1', a: '#b3262b', b: '#7a5636', ink: '#9d1f24', tile: '#fffaf0' },
+  { from: '#8c6b32', to: '#4a3618', a: '#f0e2c9', b: '#9b1c1c', ink: '#5a4220', tile: '#fbf4e6' },
   { from: '#7a5636', to: '#4a3220', a: '#f0e2c9', b: '#b3262b', ink: '#5e4028', tile: '#fbf4e6' },
-  { from: '#f6ecdc', to: '#e6d6b9', a: '#b3262b', b: '#2a1b11', ink: '#2a1b11', tile: '#ffffff' },
+  { from: '#2a1d0f', to: '#17100a', a: '#9b1c1c', b: '#8c6b32', ink: '#2a1d0f', tile: '#efdfb5' },
   { from: '#8f2a22', to: '#3a1812', a: '#f2c9a8', b: '#d65a50', ink: '#8f2a22', tile: '#fbf4e6' },
 ];
 

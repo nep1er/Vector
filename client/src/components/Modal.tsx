@@ -12,7 +12,7 @@ interface Props {
   size?: ModalSize;
   /** строка под заголовком (например, «Версия 1.1.0») */
   subtitle?: string;
-  /** закрывать по клику на тёмный фон — только для мелких окон (подтверждения, фильтры) */
+  /** закрывать по клику на тёмный фон (по умолчанию да); false — для важных окон, например настроек */
   dismissOnBackdrop?: boolean;
   /** произвольная область справа в шапке (кнопки) */
   headerExtra?: ReactNode;
@@ -23,11 +23,10 @@ interface Props {
 
 /**
  * Общая оболочка окна: шапка с крестиком, прокручиваемое тело, фиксированные кнопки внизу.
- * Закрывается по крестику и Esc. Клик по фону закрывает окно только при dismissOnBackdrop —
- * чтобы случайным кликом мимо не терять введённое в важных окнах (настройки, карточка, расширения).
- * На телефоне окно занимает весь экран.
+ * Закрывается по крестику, Esc и клику вне окна. Клик вне окна отключают точечно (dismissOnBackdrop={false}) —
+ * там, где его случайное срабатывание дорого (настройки проекта).
  */
-export default function Modal({ title, onClose, wide, size, subtitle, dismissOnBackdrop, headerExtra, flush, children }: Props) {
+export default function Modal({ title, onClose, wide, size, subtitle, dismissOnBackdrop = true, headerExtra, flush, children }: Props) {
   const s: ModalSize = size ?? (wide ? 'lg' : 'sm');
 
   useEffect(() => {

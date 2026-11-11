@@ -32,7 +32,7 @@ const isOverdue = (c: KanbanCard) => c.status_id !== 1 && !!c.work_date && new D
  * Канбан-доска: колонки слева направо, карточки сверху вниз.
  * Карточки и колонки перетаскиваются мышью (HTML5 drag&drop); у колонок есть и кнопки «влево/вправо».
  */
-const COLUMN_COLORS = ['#b3262b', '#8f2a22', '#c2674c', '#a5473a', '#7a5636', '#6a4a31', '#5e4028', '#9a8670', '#c9a27c', '#2a1b11'];
+const COLUMN_COLORS = ['#c0392b', '#e67e22', '#d9a21b', '#2f9e5b', '#1abc9c', '#4a8fd6', '#6c5ce7', '#b0529c', '#7f8c8d', '#2c3e50'];
 
 export default function KanbanBoard({ todoId, columns, canMove, canManage, startAddingColumn = false, onReload, onOpenCard, onError }: Props) {
   const [cols, setCols] = useState<KanbanColumn[]>(columns);
@@ -242,7 +242,7 @@ export default function KanbanBoard({ todoId, columns, canMove, canManage, start
                       Свой цвет
                       <input
                         type="color"
-                        value={col.column_color ?? '#7a5636'}
+                        value={col.column_color ?? '#8a6a4a'}
                         onChange={(e) => run(() => api.kanban.updateColumn(col.column_id, { color: e.target.value }))}
                       />
                     </label>

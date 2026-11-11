@@ -48,7 +48,7 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
   const [showLink, setShowLink] = useState(false);
   const [tab, setTab] = useState<'files' | 'comments'>('comments');
   const [newTagName, setNewTagName] = useState('');
-  const [newTagColor, setNewTagColor] = useState('#b3262b');
+  const [newTagColor, setNewTagColor] = useState('#4a8fd6');
 
   const loadExtras = useCallback(async () => {
     try {
@@ -117,7 +117,7 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
   };
 
   return (
-    <Modal title="Карточка" subtitle={column ? `Колонка «${column.column_title}»` : undefined} onClose={onClose} size="xl" flush>
+    <Modal title="Карточка" subtitle={column ? `Колонка «${column.column_title}»` : undefined} onClose={onClose} size="xl" flush dismissOnBackdrop={!dirty}>
       <div className="cm-layout">
         <div className="cm-main">
           <form id="card-form" onSubmit={save} className="cm-top">

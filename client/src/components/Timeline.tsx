@@ -2,7 +2,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TaskNode } from '../types';
 import { DAY, dayIndex, dayOfMonth, formatDay, monthLabel, nextMonthStart, todayIndex } from '../utils/dates';
-import { statusById, textOn } from '../utils/status';
+import { TASK_STATUSES, statusById, textOn } from '../utils/status';
 import Icon from './Icon';
 
 const ZOOMS = [4, 7, 12, 20, 32, 48, 72]; // пикселей на день
@@ -191,6 +191,14 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen, c
   return (
     <div className="timeline">
       <div className="timeline-bar">
+        <div className="tl-legend" aria-label="Цвета статусов">
+          {TASK_STATUSES.map((st) => (
+            <span key={st.id} className="tl-legend-item">
+              <i style={{ background: st.color }} />
+              {st.name}
+            </span>
+          ))}
+        </div>
         <button className="tl-btn" onClick={scrollToToday}>
           Сегодня
         </button>
@@ -288,6 +296,7 @@ export default function Timeline({ tasks, range, selectedId, onSelect, onOpen, c
                   {width > 150 && (
                     <span className="clip-dates">
                       {formatDay(s)} — {formatDay(e)}
+                      {width > 280 && ` · ${statusById(task.status_id).name}`}
                     </span>
                   )}
                   {task.tags.length > 0 && (

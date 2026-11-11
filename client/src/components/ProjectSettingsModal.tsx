@@ -51,7 +51,7 @@ export default function ProjectSettingsModal({ project, initialTab = 'general', 
   const current = tabs.find((t) => t.id === tab)!;
 
   return (
-    <Modal title={canManage ? 'Настройки проекта' : 'О проекте'} subtitle={project.title} onClose={onClose} size="xl" flush>
+    <Modal title={canManage ? 'Настройки проекта' : 'О проекте'} subtitle={project.title} onClose={onClose} size="xl" flush dismissOnBackdrop={false}>
       <div className="set-layout">
         <nav className="set-nav" role="tablist" aria-label="Разделы настроек">
           {tabs.map((t) => (
