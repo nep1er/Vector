@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api';
 import type { MyExtension, PlatformMe } from '../../types';
 import { STATUS_LABEL } from '../../utils/extensions';
+import Icon from '../Icon';
+import ExtCover from './ExtCover';
 import UploadModal from './UploadModal';
 
 export default function MineTab({ me, onOpen, refreshKey, onChanged }: { me: PlatformMe; onOpen: (id: number) => void; refreshKey: number; onChanged: () => void }) {
@@ -32,35 +34,41 @@ export default function MineTab({ me, onOpen, refreshKey, onChanged }: { me: Pla
 
   return (
     <>
-      <div className="ext-toolbar">
-        <p className="muted">Разработчики загружают архив .zip — сервер его проверяет, затем модератор одобряет версию.</p>
-        <button className="btn btn-primary" disabled={!!me.ban} onClick={() => setUpload(true)}>Загрузить расширение</button>
+      <div className="xp-toolbar">
+        <p className="xp-hint">Загрузите архив .zip: сервер проверит его, затем модератор одобрит версию.</p>
+        <button className="btn btn-primary" disabled={!!me.ban} onClick={() => setUpload(true)}>
+          <Icon name="plus" size={16} /> Загрузить расширение
+        </button>
       </div>
       {me.ban && <div className="notice notice-err">Вам закрыта публикация расширений. Причина: {me.ban.reason}. Аккаунт и проекты не затронуты.</div>}
       {error && <div className="notice notice-err">{error}</div>}
-      {items.length === 0 ? <p className="empty">Вы ещё ничего не публиковали.</p> : (
-        <div className="ext-mine">
+      {items.length === 0 ? (
+        <div className="xp-empty">
+          <Icon name="puzzle" size={36} />
+          <h3>Вы ещё ничего не публиковали</h3>
+          <p>Нажмите «Загрузить расширение», чтобы добавить первое.</p>
+        </div>
+      ) : (
+        <ul className="xm-list">
           {items.map((e) => (
-            <section key={e.id} className="panel ext-mine-item">
-              <header>
-                <button className="link-btn ext-name" onClick={() => onOpen(e.id)}>{e.name}</button>
+            <li key={e.id} className="xm-item">
+              <ExtCover name={e.name} slug={e.slug} compact />
+              <div className="xm-main">
+                <button className="xm-name" onClick={() => onOpen(e.id)}>{e.name}</button>
                 <small className="muted">{e.slug} · в библиотеках: {e.library_count}</small>
                 {e.status === 'REMOVED' && <span className="badge badge-warn">Удалено модератором: {e.removed_reason}</span>}
-                <button className="btn btn-danger-ghost btn-sm" onClick={() => remove(e)}>Удалить</button>
-              </header>
-              <ul className="ext-versions">
-                {e.versions.map((v) => (
-                  <li key={v.id}>
-                    <b>{v.version}</b>
-                    <span className={`badge ext-st-${v.status.toLowerCase()}`}>{STATUS_LABEL[v.status]}</span>
-                    {v.review_note && <span className="muted">— {v.review_note}</span>}
-                    {v.warnings.length > 0 && <span className="muted">предупреждений: {v.warnings.length}</span>}
-                  </li>
-                ))}
-              </ul>
-            </section>
+                <div className="xm-versions">
+                  {e.versions.map((v) => (
+                    <span key={v.id} className={`xm-ver ext-st-${v.status.toLowerCase()}`} title={v.review_note ?? undefined}>
+                      {v.version} · {STATUS_LABEL[v.status]}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button className="xm-del" onClick={() => remove(e)}>Удалить</button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
       {upload && <UploadModal onClose={() => setUpload(false)} onDone={() => { load(); onChanged(); }} />}
     </>

@@ -27,6 +27,7 @@ export default function Dropdown({
   children,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number }>({ left: 0, top: 0 });
   const wrap = useRef<HTMLSpanElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -46,6 +47,8 @@ export default function Dropdown({
   }, [open]);
 
   const toggle = () => {
+    // На телефоне панель — «шторка» снизу на всю ширину: так она никогда не вылезает за экран
+    setSheet(window.innerWidth <= 820);
     if (!open && btn.current) {
       const r = btn.current.getBoundingClientRect();
       const width = 340;
@@ -75,9 +78,10 @@ export default function Dropdown({
       >
         {button}
       </button>
+      {open && sheet && <div className="dropdown-scrim" onClick={() => setOpen(false)} />}
       {open && (
         <div
-          className="dropdown-panel"
+          className={sheet ? 'dropdown-panel dropdown-sheet' : 'dropdown-panel'}
           style={{
             left: pos.left,
             ...(pos.bottom !== undefined

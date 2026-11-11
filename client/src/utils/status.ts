@@ -6,12 +6,12 @@ import type { Task, TaskStatus } from '../types';
  * Актуальный список с сервера тоже доступен: api.tasks.statuses().
  */
 export const TASK_STATUSES: (TaskStatus & { color: string })[] = [
-  { id: 1, code: 'DONE', name: 'Выполнено', color: '#2f9e5b' },
-  { id: 2, code: 'IN_PROGRESS', name: 'В процессе', color: '#d9a21b' },
-  { id: 3, code: 'PLANNED', name: 'В плане', color: '#4a8fd6' },
-  { id: 4, code: 'OVERDUE', name: 'Просрочено', color: '#e0483e' },
-  { id: 5, code: 'FROZEN', name: 'Заморожено', color: '#7fb7c9' },
-  { id: 6, code: 'INACTIVE', name: 'Неактивно', color: '#8a8a8a' },
+  { id: 1, code: 'DONE', name: 'Выполнено', color: '#6a4a31' },
+  { id: 2, code: 'IN_PROGRESS', name: 'В процессе', color: '#c2674c' },
+  { id: 3, code: 'PLANNED', name: 'В плане', color: '#c9b08a' },
+  { id: 4, code: 'OVERDUE', name: 'Просрочено', color: '#b3262b' },
+  { id: 5, code: 'FROZEN', name: 'Заморожено', color: '#a89b8c' },
+  { id: 6, code: 'INACTIVE', name: 'Неактивно', color: '#d2c7b6' },
 ];
 
 /** Цвет текста (белый/тёмный) с лучшим контрастом на заливке hex-цвета */

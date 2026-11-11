@@ -3,6 +3,7 @@ import { api } from '../../api';
 import type { LibraryExtension } from '../../types';
 import { UNUSABLE_LABEL } from '../../utils/extensions';
 import Icon from '../Icon';
+import { ExtTile } from './CatalogTab';
 
 export default function LibraryTab({ onOpen, refreshKey, onChanged }: { onOpen: (id: number) => void; refreshKey: number; onChanged: () => void }) {
   const [items, setItems] = useState<LibraryExtension[]>([]);
@@ -25,26 +26,31 @@ export default function LibraryTab({ onOpen, refreshKey, onChanged }: { onOpen: 
   return (
     <>
       {error && <div className="notice notice-err">{error}</div>}
-      <p className="muted">Расширения из вашей библиотеки можно подключать в проектах, где вы администратор: Настройки проекта → «Расширения».</p>
-      {items.length === 0 ? <p className="empty">Библиотека пуста. Добавьте расширения во вкладке «Каталог».</p> : (
-        <div className="ext-grid">
-          {items.map((e) => (
-            <article key={e.id} className="ext-card">
-              <header>
-                <span className="ext-ico"><Icon name="puzzle" size={22} /></span>
-                <div>
-                  <button className="link-btn ext-name" onClick={() => onOpen(e.id)}>{e.name}</button>
-                  <small className="muted">{e.version ? `v${e.version} · ` : ''}{e.author_name}</small>
-                </div>
-              </header>
-              <p>{e.summary}</p>
-              <footer>
-                {e.unusable ? <span className="badge badge-warn">{UNUSABLE_LABEL[e.unusable]}</span> : <span />}
-                <button className="btn btn-quiet" onClick={async () => { await api.extensions.removeFromLibrary(e.id).catch(() => {}); await load(); onChanged(); }}>Убрать</button>
-              </footer>
-            </article>
-          ))}
+      {items.length === 0 ? (
+        <div className="xp-empty">
+          <Icon name="puzzle" size={36} />
+          <h3>Библиотека пуста</h3>
+          <p>Добавьте расширения во вкладке «Каталог» — потом их можно подключать в проектах.</p>
         </div>
+      ) : (
+        <>
+          <p className="xp-hint">Подключайте расширения из библиотеки в проектах, где вы администратор: Настройки проекта → Расширения.</p>
+          <div className="ext-tiles">
+            {items.map((e) => (
+              <ExtTile
+                key={e.id}
+                e={e}
+                onOpen={onOpen}
+                extra={{ badge: e.unusable ? UNUSABLE_LABEL[e.unusable] : undefined, inLibrary: true }}
+                onToggle={async () => {
+                  await api.extensions.removeFromLibrary(e.id).catch(() => {});
+                  await load();
+                  onChanged();
+                }}
+              />
+            ))}
+          </div>
+        </>
       )}
     </>
   );

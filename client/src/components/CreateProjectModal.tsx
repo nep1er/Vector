@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api } from '../api';
 import type { Project } from '../types';
+import Modal from './Modal';
 
 interface Props {
   onClose: () => void;
@@ -39,16 +40,8 @@ export default function CreateProjectModal({ onClose, onCreated }: Props) {
   };
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <form
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-title"
-        onMouseDown={(e) => e.stopPropagation()}
-        onSubmit={submit}
-      >
-        <h2 id="create-title">Новый проект</h2>
+    <Modal title="Новый проект" onClose={onClose} size="sm">
+      <form onSubmit={submit}>
         <label className="field">
           <span>Название</span>
           <input
@@ -81,6 +74,6 @@ export default function CreateProjectModal({ onClose, onCreated }: Props) {
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }

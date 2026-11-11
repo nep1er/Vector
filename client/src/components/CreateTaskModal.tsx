@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { TaskNode } from '../types';
 import { dayToInput, endIso, inputToDay, isoToInput, startIso, todayIndex } from '../utils/dates';
 import Icon from './Icon';
+import Modal from './Modal';
 
 interface Props {
   projectId: number;
@@ -71,16 +72,8 @@ export default function CreateTaskModal({ projectId, parent, canRoadmap, canTodo
   };
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <form
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="task-title"
-        onMouseDown={(e) => e.stopPropagation()}
-        onSubmit={submit}
-      >
-        <h2 id="task-title">Новая задача</h2>
+    <Modal title="Новая задача" onClose={onClose} size="sm">
+      <form onSubmit={submit}>
 
         <div className="field">
           <span>Тип</span>
@@ -152,6 +145,6 @@ export default function CreateTaskModal({ projectId, parent, canRoadmap, canTodo
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }

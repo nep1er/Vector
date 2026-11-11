@@ -4,7 +4,7 @@ import { api } from '../../api';
 import type { TaskTag } from '../../types';
 import Icon from '../Icon';
 
-const DEFAULT_COLOR = '#3b82f6';
+const DEFAULT_COLOR = '#7a5636';
 
 /** Вкладка «Теги задач»: CRUD тегов task_tag (не путать с тегами карточек Канбана). */
 export default function TagsTab({ projectId, onChanged }: { projectId: number; onChanged: () => Promise<void> | void }) {

@@ -12,6 +12,7 @@ import TodoPage from './pages/TodoPage';
 import ProjectPage from './pages/ProjectPage';
 import ExtensionsPage from './pages/ExtensionsPage';
 import ExtensionViewPage from './pages/ExtensionViewPage';
+import ExtensionDetailPage from './pages/ExtensionDetailPage';
 
 /** Пускает дальше только авторизованных, остальных отправляет на вход. */
 function Protected() {
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="tasks" element={<TasksPage />} />
           <Route path="friends" element={<FriendsPage />} />
           <Route path="extensions" element={<ExtensionsPage />} />
+          <Route path="extensions/:extensionId" element={<ExtensionDetailPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
