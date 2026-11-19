@@ -138,33 +138,36 @@ export default function TodoPage() {
           </button>
         </div>
       )}
-      <KanbanBoard
-        key={addColumnSignal /* кнопка «+» в панели открывает форму новой колонки */}
-        todoId={tid}
-        columns={columns}
-        canMove={canMove}
-        canManage={canManage}
-        startAddingColumn={addColumnSignal > 0}
-        onReload={load}
-        onOpenCard={(c) => setOpenCardId(c.id)}
-        onError={setActionError}
-      />
-
-      {openCard && (
-        <CardModal
-          card={openCard}
-          projectId={pid}
-          columns={columns}
-          projectTags={tags}
-          participants={participants}
-          canEdit={canManage}
-          canMove={canMove}
-          canComment={canMove}
-          isAdmin={can('ADMIN')}
-          onChanged={load}
-          onClose={() => setOpenCardId(null)}
-        />
-      )}
+      <div className={openCard ? 'todo-layout has-card' : 'todo-layout'}>
+        <div className="todo-board">
+          <KanbanBoard
+            key={addColumnSignal /* кнопка «+» в панели открывает форму новой колонки */}
+            todoId={tid}
+            columns={columns}
+            canMove={canMove}
+            canManage={canManage}
+            startAddingColumn={addColumnSignal > 0}
+            onReload={load}
+            onOpenCard={(c) => setOpenCardId(c.id)}
+            onError={setActionError}
+          />
+        </div>
+        {openCard && (
+          <CardModal
+            card={openCard}
+            projectId={pid}
+            columns={columns}
+            projectTags={tags}
+            participants={participants}
+            canEdit={canManage}
+            canMove={canMove}
+            canComment={canMove}
+            isAdmin={can('ADMIN')}
+            onChanged={load}
+            onClose={() => setOpenCardId(null)}
+          />
+        )}
+      </div>
 
       {settingsTab && (
         <ProjectSettingsModal

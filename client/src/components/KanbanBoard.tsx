@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DragEvent, FormEvent } from 'react';
+import type { CSSProperties, DragEvent, FormEvent } from 'react';
 import { api } from '../api';
 import type { KanbanCard, KanbanColumn } from '../types';
-import { textOn } from '../utils/status';
 import Avatar from './Avatar';
 import Dropdown from './Dropdown';
 import Icon from './Icon';
@@ -172,12 +171,12 @@ export default function KanbanBoard({ todoId, columns, canMove, canManage, start
         <section
           key={col.column_id}
           data-col-id={col.column_id}
-          className={`kcol${colDrop === ci ? ' kcol-drop-before' : ''}${colDrop === cols.length && ci === cols.length - 1 ? ' kcol-drop-after' : ''}`}
+          className={`kcol${col.column_color ? ' kcol-colored' : ''}${colDrop === ci ? ' kcol-drop-before' : ''}${colDrop === cols.length && ci === cols.length - 1 ? ' kcol-drop-after' : ''}`}
           aria-label={`Колонка ${col.column_title}`}
+          style={col.column_color ? ({ '--kc': col.column_color } as CSSProperties) : undefined}
         >
           <header
-            style={col.column_color ? { background: col.column_color, color: textOn(col.column_color) } : undefined}
-            className={col.column_color ? 'kcol-head kcol-head-colored' : 'kcol-head'}
+            className="kcol-head"
             draggable={canManage && editingColumn !== col.column_id}
             onDragStart={(e) => {
               drag.current = { type: 'column', id: col.column_id };

@@ -31,131 +31,189 @@ export default function DashboardPage() {
 
   if (error)
     return (
-      <div className="dash">
+      <div className="dsh">
         <Link to={`/projects/${pid}`} className="link-btn">← К проекту</Link>
         <div className="notice notice-err">{error}</div>
       </div>
     );
-  if (!data) return <div className="dash"><p className="muted">Загрузка…</p></div>;
+  if (!data) return <div className="dsh"><p className="muted">Загрузка…</p></div>;
 
   const { tasks, cards } = data;
   const maxWeek = Math.max(1, ...data.weeks.map((w) => w.done + w.open));
   const maxLoad = Math.max(1, ...data.people.map((p) => p.assigned));
   const thisWeek = data.weeks[4]?.start;
+  const attention = tasks.no_dates + cards.unassigned;
 
   return (
-    <div className="dash">
-      <div className="dash-head">
+    <div className="dsh">
+      <header className="dsh-head">
         <div>
           <Link to={`/projects/${pid}`} className="link-btn">← К проекту</Link>
-          <h1>Дашборд{title ? ` · ${title}` : ''}</h1>
+          <h1>Дашборд</h1>
+          {title && <p className="muted">{title}</p>}
         </div>
         <button className="btn btn-secondary" onClick={load}>Обновить</button>
+      </header>
+
+      <div className="dsh-kpis">
+        <div className="dsh-kpi">
+          <span>Задач в плане</span>
+          <b>{tasks.total}</b>
+          <small>этапов {tasks.roadmaps} · ToDo {tasks.todos}</small>
+        </div>
+        <div className="dsh-kpi">
+          <span>Выполнено</span>
+          <b>{pct(tasks.done, tasks.total)}%</b>
+          <small>{tasks.done} из {tasks.total} задач</small>
+        </div>
+        <div className={tasks.overdue ? 'dsh-kpi bad' : 'dsh-kpi'}>
+          <span>Просрочено</span>
+          <b>{tasks.overdue}</b>
+          <small>срок вышел, не выполнено</small>
+        </div>
+        <div className="dsh-kpi">
+          <span>Карточки</span>
+          <b>{pct(cards.done, cards.total)}%</b>
+          <small>{cards.done} из {cards.total}{cards.overdue ? ` · просрочено ${cards.overdue}` : ''}</small>
+        </div>
+        <div className={attention ? 'dsh-kpi warn' : 'dsh-kpi'}>
+          <span>Требуют внимания</span>
+          <b>{attention}</b>
+          <small>без дат {tasks.no_dates} · без исполнителя {cards.unassigned}</small>
+        </div>
       </div>
 
-      <div className="kpis">
-        <div className="kpi"><span className="kpi-label">Задач в плане</span><b>{tasks.total}</b><span className="muted">этапов {tasks.roadmaps} · ToDo {tasks.todos}</span></div>
-        <div className="kpi"><span className="kpi-label">Выполнено</span><b>{pct(tasks.done, tasks.total)}%</b><span className="muted">{tasks.done} из {tasks.total}</span></div>
-        <div className={tasks.overdue ? 'kpi kpi-bad' : 'kpi'}><span className="kpi-label">Просрочено</span><b>{tasks.overdue}</b><span className="muted">срок вышел, не выполнено</span></div>
-        <div className="kpi"><span className="kpi-label">Карточки</span><b>{pct(cards.done, cards.total)}%</b><span className="muted">{cards.done} из {cards.total} · просрочено {cards.overdue}</span></div>
-        <div className={tasks.no_dates || cards.unassigned ? 'kpi kpi-warn' : 'kpi'}><span className="kpi-label">Требуют внимания</span><b>{tasks.no_dates + cards.unassigned}</b><span className="muted">без дат {tasks.no_dates} · без исполнителя {cards.unassigned}</span></div>
-      </div>
-
-      <div className="dash-grid">
-        <section className="panel dash-wide">
-          <h2>Статусы задач</h2>
-          <div className="stack-bar" role="img" aria-label="Распределение по статусам">
-            {TASK_STATUSES.map((s) => {
-              const n = tasks.by_status[s.id] ?? 0;
-              return n ? <span key={s.id} style={{ width: `${pct(n, tasks.total)}%`, background: s.color }} title={`${s.name}: ${n}`} /> : null;
-            })}
-          </div>
-          <ul className="legend">
-            {TASK_STATUSES.map((s) => (
-              <li key={s.id}><i style={{ background: s.color }} />{s.name}<b>{tasks.by_status[s.id] ?? 0}</b></li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="panel dash-wide">
-          <h2>Сроки по неделям <span className="muted">— сколько задач заканчивается</span></h2>
-          <div className="week-chart">
-            {data.weeks.map((w) => (
-              <div key={w.start} className={w.start === thisWeek ? 'week now' : 'week'} title={`Неделя с ${fmt(w.start)}: выполнено ${w.done}, не закрыто ${w.open}`}>
-                <div className="week-bars" style={{ height: `${((w.done + w.open) / maxWeek) * 100}%` }}>
-                  <span className="wb-open" style={{ flex: w.open }} />
-                  <span className="wb-done" style={{ flex: w.done }} />
-                </div>
-                <span className="week-label">{fmt(w.start)}</span>
-              </div>
-            ))}
-          </div>
-          <ul className="legend"><li><i className="lg-open" />Не закрыто</li><li><i className="lg-done" />Выполнено</li></ul>
-        </section>
-
-        <section className="panel">
-          <h2>Просроченные</h2>
-          {data.overdue_list.length === 0 ? <p className="muted">Просрочек нет 🎉</p> : (
-            <ul className="dash-list">
-              {data.overdue_list.map((t) => (
-                <li key={t.id}><Link to={link(t)}>{t.title}</Link><span className="late">{t.days_late} {daysWord(t.days_late ?? 0)}</span></li>
-              ))}
+      <div className="dsh-cols">
+        <div className="dsh-col">
+          <section className="dsh-card">
+            <h2>Статусы задач</h2>
+            <ul className="dsh-stat">
+              {TASK_STATUSES.map((s) => {
+                const n = tasks.by_status[s.id] ?? 0;
+                return (
+                  <li key={s.id} className={n ? undefined : 'zero'}>
+                    <i style={{ background: s.color }} />
+                    <span className="dsh-stat-name">{s.name}</span>
+                    <span className="dsh-track"><em style={{ width: `${pct(n, tasks.total)}%`, background: s.color }} /></span>
+                    <b>{n}</b>
+                    <span className="dsh-stat-pct">{pct(n, tasks.total)}%</span>
+                  </li>
+                );
+              })}
             </ul>
-          )}
-          {tasks.overdue > data.overdue_list.length && <p className="muted">и ещё {tasks.overdue - data.overdue_list.length}…</p>}
-        </section>
+          </section>
 
-        <section className="panel">
-          <h2>Ближайшие 7 дней</h2>
-          {data.soon_list.length === 0 ? <p className="muted">Ближайших сроков нет.</p> : (
-            <ul className="dash-list">
-              {data.soon_list.map((t) => (
-                <li key={t.id}><Link to={link(t)}>{t.title}</Link><span className="muted"><i className="dot" style={{ background: statusById(t.status_id).color }} />{fmt(t.end_date)}</span></li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="panel">
-          <h2>Нагрузка участников <span className="muted">— карточки</span></h2>
-          {data.people.length === 0 ? <p className="muted">Участников нет.</p> : (
-            <ul className="people">
-              {data.people.map((p) => (
-                <li key={p.id}>
-                  <Avatar user={{ username: p.username, avatar_url: p.avatar_url }} size={32} />
-                  <div className="people-main">
-                    <div className="people-top"><span>{p.username}</span><span className="muted">{p.done}/{p.assigned}{p.overdue ? ` · просрочено ${p.overdue}` : ''}</span></div>
-                    <div className="meter"><span className="meter-done" style={{ width: `${(p.done / maxLoad) * 100}%` }} /><span className={p.overdue ? 'meter-late' : 'meter-open'} style={{ width: `${((p.assigned - p.done) / maxLoad) * 100}%` }} /></div>
+          <section className="dsh-card">
+            <h2>Сроки по неделям</h2>
+            <p className="dsh-sub">Сколько задач заканчивается в каждую неделю (с понедельника)</p>
+            <div className="dsh-weeks">
+              {data.weeks.map((w) => {
+                const total = w.done + w.open;
+                return (
+                  <div key={w.start} className={w.start === thisWeek ? 'dsh-week now' : 'dsh-week'} title={`Неделя с ${fmt(w.start)}: выполнено ${w.done}, не закрыто ${w.open}`}>
+                    <span className="dsh-week-n">{total || ''}</span>
+                    <div className="dsh-week-bar" style={{ height: `${(total / maxWeek) * 100}%` }}>
+                      <span className="open" style={{ flex: w.open }} />
+                      <span className="done" style={{ flex: w.done }} />
+                    </div>
+                    <span className="dsh-week-label">{w.start === thisWeek ? 'Сейчас' : fmt(w.start)}</span>
                   </div>
-                </li>
-              ))}
+                );
+              })}
+            </div>
+            <ul className="dsh-key">
+              <li><i className="open" />Не закрыто</li>
+              <li><i className="done" />Выполнено</li>
             </ul>
-          )}
-        </section>
+          </section>
 
-        <section className="panel">
-          <h2>Отстающие ToDo <span className="muted">— меньше всего закрытых карточек</span></h2>
-          {data.todo_progress.length === 0 ? <p className="muted">Нет ToDo с карточками.</p> : (
-            <ul className="dash-list">
-              {data.todo_progress.map((t) => (
-                <li key={t.id} className="prog">
-                  <div className="prog-top"><Link to={link(t)}>{t.title}</Link><span className="muted">{t.cards_done}/{t.cards_total} · до {fmt(t.end_date)}</span></div>
-                  <div className="meter"><span className="meter-done" style={{ width: `${pct(t.cards_done, t.cards_total)}%` }} /></div>
-                </li>
-              ))}
+          <section className="dsh-card">
+            <h2>Нагрузка участников</h2>
+            <p className="dsh-sub">Карточки Канбана на человека</p>
+            {data.people.length === 0 ? <p className="muted">Участников нет.</p> : (
+              <ul className="dsh-people">
+                {data.people.map((p) => {
+                  const late = Math.min(p.overdue, p.assigned - p.done);
+                  const open = Math.max(0, p.assigned - p.done - late);
+                  return (
+                    <li key={p.id}>
+                      <Avatar user={{ username: p.username, avatar_url: p.avatar_url }} size={28} />
+                      <span className="dsh-people-name">{p.username}</span>
+                      <span className="dsh-track dsh-load">
+                        <em className="done" style={{ width: `${(p.done / maxLoad) * 100}%` }} />
+                        <em className="open" style={{ width: `${(open / maxLoad) * 100}%` }} />
+                        <em className="late" style={{ width: `${(late / maxLoad) * 100}%` }} />
+                      </span>
+                      <span className="dsh-people-n">{p.done}/{p.assigned}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <ul className="dsh-key">
+              <li><i className="done" />Закрыто</li>
+              <li><i className="open" />В работе</li>
+              <li><i className="late" />Просрочено</li>
             </ul>
-          )}
-        </section>
+          </section>
+        </div>
 
-        <section className="panel dash-wide">
-          <h2>Смещения сроков</h2>
-          {data.shifts.count === 0 ? <p className="muted">Смещений не было — план держится.</p> : (
-            <p>
-              Смещений: <b>{data.shifts.count}</b> · сдвинуто задач (без отменённых): <b>{data.shifts.tasks}</b> · суммарно <b>{data.shifts.days}</b> {daysWord(data.shifts.days)}
-              {data.shifts.last_at ? <span className="muted"> · последнее {new Date(data.shifts.last_at).toLocaleDateString('ru-RU')}</span> : null}. Подробности — в «Смещении сроков» на RoadMap.
-            </p>
-          )}
-        </section>
+        <div className="dsh-col">
+          <section className="dsh-card">
+            <h2>Просроченные {tasks.overdue > 0 && <span className="dsh-badge bad">{tasks.overdue}</span>}</h2>
+            {data.overdue_list.length === 0 ? <p className="muted">Просрочек нет 🎉</p> : (
+              <ul className="dsh-list">
+                {data.overdue_list.map((t) => (
+                  <li key={t.id}><Link to={link(t)}>{t.title}</Link><span className="late">{t.days_late} {daysWord(t.days_late ?? 0)}</span></li>
+                ))}
+              </ul>
+            )}
+            {tasks.overdue > data.overdue_list.length && <p className="muted">и ещё {tasks.overdue - data.overdue_list.length}…</p>}
+          </section>
+
+          <section className="dsh-card">
+            <h2>Ближайшие 7 дней</h2>
+            {data.soon_list.length === 0 ? <p className="muted">Ближайших сроков нет.</p> : (
+              <ul className="dsh-list">
+                {data.soon_list.map((t) => (
+                  <li key={t.id}>
+                    <Link to={link(t)}>{t.title}</Link>
+                    <span className="dsh-due"><i style={{ background: statusById(t.status_id).color }} />{fmt(t.end_date)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="dsh-card">
+            <h2>Отстающие ToDo</h2>
+            <p className="dsh-sub">Меньше всего закрытых карточек</p>
+            {data.todo_progress.length === 0 ? <p className="muted">Нет ToDo с карточками.</p> : (
+              <ul className="dsh-list dsh-prog">
+                {data.todo_progress.map((t) => (
+                  <li key={t.id}>
+                    <div className="dsh-prog-top"><Link to={link(t)}>{t.title}</Link><span className="muted">{t.cards_done}/{t.cards_total} · до {fmt(t.end_date)}</span></div>
+                    <span className="dsh-track"><em className="done" style={{ width: `${pct(t.cards_done, t.cards_total)}%` }} /></span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="dsh-card">
+            <h2>Смещения сроков</h2>
+            {data.shifts.count === 0 ? <p className="muted">Смещений не было — план держится.</p> : (
+              <>
+                <div className="dsh-shift">
+                  <div><b>{data.shifts.count}</b><span>смещений</span></div>
+                  <div><b>{data.shifts.tasks}</b><span>задач сдвинуто</span></div>
+                  <div><b>{data.shifts.days}</b><span>{daysWord(data.shifts.days)} суммарно</span></div>
+                </div>
+                {data.shifts.last_at && <p className="dsh-sub">Последнее: {new Date(data.shifts.last_at).toLocaleDateString('ru-RU')}. Подробности — в «Смещении сроков» на RoadMap.</p>}
+              </>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );

@@ -8,7 +8,6 @@ import Dropdown from './Dropdown';
 import Icon from './Icon';
 import FileDrop from './FileDrop';
 import FileItem from './FileItem';
-import Modal from './Modal';
 import { MAX_UPLOAD_MB, formatSize, tooBig } from '../utils/format';
 
 interface Props {
@@ -64,6 +63,12 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
     loadExtras();
   }, [loadExtras]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !(e.target instanceof HTMLTextAreaElement) && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   // Если карточку удалили или она пропала с доски (например, у другого пользователя) — закрываем окно
   const column = columns.find((c) => c.column_id === card.kanban_column_id);
 
@@ -117,7 +122,23 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
   };
 
   return (
-    <Modal title="Карточка" subtitle={column ? `Колонка «${column.column_title}»` : undefined} onClose={onClose} size="xl" flush dismissOnBackdrop={!dirty}>
+    <aside className="cp" aria-label="Карточка">
+      <header className="cp-head">
+        <div className="cp-titles">
+          <h2>Карточка</h2>
+          {column && <p>Колонка «{column.column_title}»</p>}
+        </div>
+        <div className="cp-tools">
+          {canEdit && (
+            <button type="button" className="icon-btn cp-trash" disabled={busy} onClick={doDelete} aria-label="Удалить карточку" title="Удалить карточку">
+              <Icon name="trash" size={18} />
+            </button>
+          )}
+          <button className="icon-btn" onClick={onClose} aria-label="Закрыть карточку" title="Закрыть">
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+      </header>
       <div className="cm-layout">
         <div className="cm-main">
           <form id="card-form" onSubmit={save} className="cm-top">
@@ -455,15 +476,8 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
               {!canEdit && card.participants.length === 0 && <span className="muted">—</span>}
             </div>
           </div>
-
-          {canEdit && (
-            <button type="button" className="cm-delete" disabled={busy} onClick={doDelete}>
-              <Icon name="trash" size={16} />
-              Удалить карточку
-            </button>
-          )}
         </aside>
       </div>
-    </Modal>
+    </aside>
   );
 }

@@ -34,71 +34,79 @@ export default function RoadmapFilters({ tags, value, onChange }: Props) {
         </>
       }
     >
-      <div className="filter-panel">
-        <div className="filter-head">
+      <div className="fp">
+        <div className="fp-head">
           <strong>Фильтры</strong>
-          {filtersActive(value) && (
-            <button type="button" className="link-btn" onClick={() => onChange(EMPTY_FILTERS)}>
-              Сбросить
-            </button>
-          )}
+          {count > 0 && <span className="fp-count">{count}</span>}
         </div>
 
-        <div className="filter-block">
-          <span className="filter-label">Статус</span>
-          <div className="chips">
-            {TASK_STATUSES.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={value.statusIds.includes(s.id) ? 'fchip on' : 'fchip'}
-                onClick={() => onChange({ ...value, statusIds: toggle(value.statusIds, s.id) })}
-              >
-                <i className="dot" style={{ background: s.color }} />
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="filter-block">
-          <span className="filter-label">Теги</span>
-          {tags.length === 0 ? (
-            <span className="muted hint">В проекте нет тегов</span>
-          ) : (
-            <div className="chips">
-              {tags.map((t) => (
+        <section className="fp-sec">
+          <h4>Статус</h4>
+          <div className="fp-grid">
+            {TASK_STATUSES.map((s) => {
+              const on = value.statusIds.includes(s.id);
+              return (
                 <button
-                  key={t.id}
+                  key={s.id}
                   type="button"
-                  className={value.tagIds.includes(t.id) ? 'fchip on' : 'fchip'}
-                  onClick={() => onChange({ ...value, tagIds: toggle(value.tagIds, t.id) })}
+                  aria-pressed={on}
+                  className={on ? 'fp-opt on' : 'fp-opt'}
+                  onClick={() => onChange({ ...value, statusIds: toggle(value.statusIds, s.id) })}
                 >
-                  <i className="dot" style={{ background: t.color_code }} />
-                  {t.name}
+                  <i className="dot" style={{ background: s.color }} />
+                  <span>{s.name}</span>
+                  <b className="fp-tick">{on && <Icon name="check" size={12} />}</b>
                 </button>
-              ))}
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="fp-sec">
+          <h4>Теги</h4>
+          {tags.length === 0 ? (
+            <p className="muted fp-none">В проекте нет тегов</p>
+          ) : (
+            <div className="fp-grid">
+              {tags.map((t) => {
+                const on = value.tagIds.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    aria-pressed={on}
+                    className={on ? 'fp-opt on' : 'fp-opt'}
+                    onClick={() => onChange({ ...value, tagIds: toggle(value.tagIds, t.id) })}
+                  >
+                    <i className="dot" style={{ background: t.color_code }} />
+                    <span>{t.name}</span>
+                    <b className="fp-tick">{on && <Icon name="check" size={12} />}</b>
+                  </button>
+                );
+              })}
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="filter-block">
-          <span className="filter-label">Период</span>
-          <div className="date-grid">
-            <input
-              type="date"
-              aria-label="С даты"
-              value={value.from}
-              onChange={(e) => onChange({ ...value, from: e.target.value })}
-            />
-            <input
-              type="date"
-              aria-label="По дату"
-              value={value.to}
-              onChange={(e) => onChange({ ...value, to: e.target.value })}
-            />
+        <section className="fp-sec">
+          <h4>Период</h4>
+          <div className="fp-dates">
+            <label>
+              <span>С</span>
+              <input type="date" value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} />
+            </label>
+            <label>
+              <span>По</span>
+              <input type="date" value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} />
+            </label>
           </div>
-        </div>
+        </section>
+
+        <footer className="fp-foot">
+          <button type="button" className="btn btn-quiet" disabled={!filtersActive(value)} onClick={() => onChange(EMPTY_FILTERS)}>
+            Сбросить всё
+          </button>
+        </footer>
       </div>
     </Dropdown>
   );
