@@ -48,6 +48,7 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
   const [tab, setTab] = useState<'files' | 'comments'>('comments');
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState('#4a8fd6');
+  const [editTag, setEditTag] = useState<{ id: number; name: string; color: string } | null>(null);
 
   const loadExtras = useCallback(async () => {
     try {
@@ -397,18 +398,67 @@ export default function CardModal({ card, projectId, columns, projectTags, parti
                 <Dropdown buttonClassName="add-chip" ariaLabel="Добавить тег" title="Добавить тег" disabled={busy} button={<Icon name="plus" size={14} />}>
                   <div className="pick-list">
                     {projectTags.length === 0 && <p className="muted hint">Тегов Канбана в проекте пока нет — создайте первый:</p>}
-                    {projectTags.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        className="pick-item"
-                        onClick={() => run(() => (tagged.has(t.id) ? api.kanban.removeCardTag(card.id, t.id) : api.kanban.addCardTag(card.id, t.id)))}
-                      >
-                        <i className="dot" style={{ background: t.color_code }} />
-                        <span>{t.name}</span>
-                        {tagged.has(t.id) && <Icon name="check" size={16} />}
-                      </button>
-                    ))}
+                    {projectTags.map((t) =>
+                      editTag?.id === t.id ? (
+                        <form
+                          key={t.id}
+                          className="tag-edit"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const name = editTag.name.trim();
+                            if (!name) return;
+                            run(async () => {
+                              await api.kanbanTags.update(t.id, { name, colorCode: editTag.color });
+                              setEditTag(null);
+                            });
+                          }}
+                        >
+                          <input type="color" value={editTag.color} aria-label="Цвет тега" onChange={(e) => setEditTag({ ...editTag, color: e.target.value })} />
+                          <input autoFocus value={editTag.name} maxLength={50} aria-label="Название тега" onChange={(e) => setEditTag({ ...editTag, name: e.target.value })} />
+                          <button className="icon-btn" aria-label="Сохранить тег" title="Сохранить" disabled={busy || !editTag.name.trim()}>
+                            <Icon name="check" size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label="Удалить тег"
+                            title="Удалить тег из проекта"
+                            disabled={busy}
+                            onClick={() => {
+                              if (window.confirm(`Удалить тег «${t.name}» из проекта? Он пропадёт со всех карточек.`)) {
+                                run(async () => {
+                                  await api.kanbanTags.remove(t.id);
+                                  setEditTag(null);
+                                });
+                              }
+                            }}
+                          >
+                            <Icon name="trash" size={16} />
+                          </button>
+                        </form>
+                      ) : (
+                        <div key={t.id} className="pick-row">
+                          <button
+                            type="button"
+                            className="pick-item"
+                            onClick={() => run(() => (tagged.has(t.id) ? api.kanban.removeCardTag(card.id, t.id) : api.kanban.addCardTag(card.id, t.id)))}
+                          >
+                            <i className="dot" style={{ background: t.color_code }} />
+                            <span>{t.name}</span>
+                            {tagged.has(t.id) && <Icon name="check" size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label={`Изменить тег ${t.name}`}
+                            title="Изменить тег"
+                            onClick={() => setEditTag({ id: t.id, name: t.name, color: t.color_code || '#4a8fd6' })}
+                          >
+                            <Icon name="edit" size={16} />
+                          </button>
+                        </div>
+                      ),
+                    )}
                     <form
                       className="tag-create"
                       onSubmit={(e) => {

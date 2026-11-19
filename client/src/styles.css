@@ -5098,3 +5098,37 @@ select {
     gap: 6px;
   }
 }
+
+/* Правка тегов в списке выбора */
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pick-row .pick-item {
+  flex: 1;
+  min-width: 0;
+}
+.pick-row .icon-btn {
+  flex: none;
+  opacity: 0.6;
+}
+.pick-row:hover .icon-btn,
+.pick-row .icon-btn:focus-visible {
+  opacity: 1;
+}
+.tag-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.tag-edit input[type='color'] {
+  width: 34px;
+  padding: 0;
+  flex: none;
+}
+.tag-edit input:not([type='color']) {
+  flex: 1;
+  min-width: 0;
+}

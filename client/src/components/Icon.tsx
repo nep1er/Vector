@@ -12,6 +12,7 @@ for (const [path, svg] of Object.entries(modules)) {
 }
 
 export type IconName =
+  | 'edit'
   | 'folder'
   | 'tasks'
   | 'user'

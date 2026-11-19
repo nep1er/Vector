@@ -154,6 +154,7 @@ export default function TodoPage() {
         </div>
         {openCard && (
           <CardModal
+            key={openCard.id}
             card={openCard}
             projectId={pid}
             columns={columns}
