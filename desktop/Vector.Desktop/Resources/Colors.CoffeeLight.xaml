@@ -29,6 +29,7 @@
     <SolidColorBrush x:Key="Brush.Text" Color="{StaticResource Color.Text}" />
     <SolidColorBrush x:Key="Brush.TextMuted" Color="{StaticResource Color.TextMuted}" />
     <SolidColorBrush x:Key="Brush.Accent" Color="{StaticResource Color.Accent}" />
+    <SolidColorBrush x:Key="Brush.AccentHover" Color="{StaticResource Color.AccentHover}" />
     <SolidColorBrush x:Key="Brush.Sidebar" Color="{StaticResource Color.Sidebar}" />
     <SolidColorBrush x:Key="Brush.SidebarHover" Color="{StaticResource Color.SidebarHover}" />
     <SolidColorBrush x:Key="Brush.SidebarActive" Color="{StaticResource Color.SidebarActive}" />
