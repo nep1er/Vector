@@ -70,6 +70,8 @@ public partial class MainWindow : Window
             foreach (var project in projects)
                 _projects.Add(new ProjectCard(project, _apiBase));
             ProjectsSummary.Text = _projects.Count > 0 ? $"Всего проектов: {_projects.Count}" : string.Empty;
+            ProjectSearch.Visibility = _projects.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            SearchPlaceholder.Visibility = _projects.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             StatusMessage.Visibility = Visibility.Collapsed;
             EmptyState.Visibility = _projects.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -127,6 +129,8 @@ public partial class MainWindow : Window
 
     private void ProjectSearch_TextChanged(object sender, TextChangedEventArgs e)
     {
+        SearchPlaceholder.Visibility = string.IsNullOrEmpty(ProjectSearch.Text) && _projects.Count > 0
+            ? Visibility.Visible : Visibility.Collapsed;
         if (string.IsNullOrWhiteSpace(ProjectSearch.Text))
         {
             ProjectsItems.ItemsSource = _projects;
