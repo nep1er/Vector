@@ -8,4 +8,8 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Resource Include="..\\..\\resources\\brand\\logo.png" Link="Resources\\Brand\\logo.png" />
+  </ItemGroup>
+
 </Project>
