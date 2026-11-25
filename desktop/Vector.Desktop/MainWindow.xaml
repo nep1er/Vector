@@ -99,25 +99,25 @@
                 <StackPanel Margin="12,0,12,16">
                     <Button Style="{StaticResource SideNavButton}" Tag="Active" Click="NavigationButton_Click">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="▱" FontSize="19" Width="28" VerticalAlignment="Center"/>
+                            <Path Width="18" Height="18" Margin="0,0,10,0" Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" StrokeThickness="1.6" Data="M3,6 L3,19 L21,19 L21,8 L12,8 L10,6 Z M3,9 L21,9"/>
                             <TextBlock Text="Проекты" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource SideNavButton}" Click="NavigationButton_Click" Tag="Задачи">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="☷" FontSize="18" Width="28" VerticalAlignment="Center"/>
+                            <Path Width="18" Height="18" Margin="0,0,10,0" Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" StrokeThickness="1.6" Data="M5,5 L7,5 M10,5 L19,5 M5,12 L7,12 M10,12 L19,12 M5,19 L7,19 M10,19 L19,19"/>
                             <TextBlock Text="Задачи" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource SideNavButton}" Click="NavigationButton_Click" Tag="Друзья">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="♧" FontSize="19" Width="28" VerticalAlignment="Center"/>
+                            <Path Width="18" Height="18" Margin="0,0,10,0" Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" StrokeThickness="1.6" Data="M12,11 A4,4 0 1 0 12,3 A4,4 0 1 0 12,11 M4,21 C4,16 8,14 12,14 C16,14 20,16 20,21"/>
                             <TextBlock Text="Друзья" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource SideNavButton}" Click="NavigationButton_Click" Tag="Расширения">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="◇" FontSize="19" Width="28" VerticalAlignment="Center"/>
+                            <Path Width="18" Height="18" Margin="0,0,10,0" Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" StrokeThickness="1.6" Data="M8,3 L16,3 L16,8 L21,8 L21,16 L16,16 L16,21 L8,21 L8,16 L3,16 L3,8 L8,8 Z"/>
                             <TextBlock Text="Расширения" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -128,7 +128,7 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="♧" FontSize="18" VerticalAlignment="Center"/>
+                            <Path Width="18" Height="18" Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" StrokeThickness="1.6" Data="M18,9 C18,5 15,3 12,3 C9,3 6,5 6,9 C6,15 4,16 4,18 L20,18 C20,16 18,15 18,9 M10,21 L14,21"/>
                             <TextBlock Grid.Column="1" Text="Уведомления" VerticalAlignment="Center"/>
                             <Border x:Name="UnreadBadge" Grid.Column="2" Background="{StaticResource Brush.Accent}"
                                     CornerRadius="10" Padding="6,1" Visibility="Collapsed">
@@ -190,10 +190,13 @@
                                     <TextBlock x:Name="ProjectsSummary" Text="" Margin="0,4,0,0"
                                                FontSize="14" Foreground="{StaticResource Brush.TextMuted}"/>
                                 </StackPanel>
-                                <TextBox x:Name="ProjectSearch" Grid.Column="1" Style="{StaticResource SearchBox}"
-                                         Margin="20,0,16,0" VerticalAlignment="Center"
-                                         TextChanged="ProjectSearch_TextChanged"
-                                         ToolTip="Найти проект"/>
+                                <Grid Grid.Column="1" Margin="20,0,16,0" VerticalAlignment="Center">
+                                    <TextBox x:Name="ProjectSearch" Style="{StaticResource SearchBox}"
+                                             TextChanged="ProjectSearch_TextChanged" Visibility="Collapsed"/>
+                                    <TextBlock Text="Найти проект" Margin="34,0,0,0" VerticalAlignment="Center"
+                                               Foreground="{StaticResource Brush.TextMuted}" IsHitTestVisible="False"
+                                               x:Name="SearchPlaceholder" Visibility="Collapsed"/>
+                                </Grid>
                                 <Button Grid.Column="2" Style="{StaticResource PrimaryButton}"
                                         VerticalAlignment="Center" Click="CreateProjectButton_Click">
                                     <StackPanel Orientation="Horizontal">
