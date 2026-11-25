@@ -17,6 +17,9 @@
     <Color x:Key="Color.SidebarActive">#5A4228</Color>
     <Color x:Key="Color.SidebarText">#F3E8D0</Color>
     <Color x:Key="Color.SidebarMuted">#C9B690</Color>
+    <Color x:Key="Color.SidebarBorder">#54402A</Color>
+    <Color x:Key="Color.Input">#F7EED3</Color>
+    <Color x:Key="Color.Danger">#A31616</Color>
 
     <SolidColorBrush x:Key="Brush.Background" Color="{StaticResource Color.Background}" />
     <SolidColorBrush x:Key="Brush.Surface" Color="{StaticResource Color.Surface}" />
@@ -31,6 +34,10 @@
     <SolidColorBrush x:Key="Brush.SidebarActive" Color="{StaticResource Color.SidebarActive}" />
     <SolidColorBrush x:Key="Brush.SidebarText" Color="{StaticResource Color.SidebarText}" />
     <SolidColorBrush x:Key="Brush.SidebarMuted" Color="{StaticResource Color.SidebarMuted}" />
+    <SolidColorBrush x:Key="Brush.SidebarBorder" Color="{StaticResource Color.SidebarBorder}" />
+    <SolidColorBrush x:Key="Brush.Input" Color="{StaticResource Color.Input}" />
+    <SolidColorBrush x:Key="Brush.Danger" Color="{StaticResource Color.Danger}" />
+    <SolidColorBrush x:Key="Brush.BorderStrong" Color="{StaticResource Color.BorderStrong}" />
 
     <Style x:Key="NavigationButton" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource Brush.SidebarText}" />
