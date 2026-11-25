@@ -25,7 +25,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         ProjectsItems.ItemsSource = _projects;
         _token = Environment.GetEnvironmentVariable("VECTOR_TOKEN") ?? ReadLocalToken();
-        Loaded += async (_, _) => await LoadProjectsAsync();
+        Loaded += async (_, _) =>
+        {
+            await LoadProjectsAsync();
+            await LoadProfileAsync();
+        };
     }
 
     private static string? ReadLocalToken()
@@ -43,6 +47,7 @@ public partial class MainWindow : Window
 
     private async Task LoadProjectsAsync()
     {
+        ProjectsItems.ItemsSource = _projects;
         _projects.Clear();
         EmptyState.Visibility = Visibility.Collapsed;
         StatusMessage.Visibility = Visibility.Visible;
@@ -63,7 +68,7 @@ public partial class MainWindow : Window
             var projects = await JsonSerializer.DeserializeAsync<List<ProjectDto>>(
                 await response.Content.ReadAsStreamAsync(), JsonOptions) ?? [];
             foreach (var project in projects)
-                _projects.Add(new ProjectCard(project));
+                _projects.Add(new ProjectCard(project, _apiBase));
             ProjectsSummary.Text = _projects.Count > 0 ? $"Всего проектов: {_projects.Count}" : string.Empty;
             StatusMessage.Visibility = Visibility.Collapsed;
             EmptyState.Visibility = _projects.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -73,6 +78,51 @@ public partial class MainWindow : Window
             StatusMessage.Text = $"Не удалось загрузить проекты: {ex.Message}";
             StatusMessage.Visibility = Visibility.Visible;
         }
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_token)) return;
+        try
+        {
+            using var userRequest = new HttpRequestMessage(HttpMethod.Get, $"{_apiBase.TrimEnd('/')}/api/auth/me");
+            userRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            using var userResponse = await Http.SendAsync(userRequest);
+            if (userResponse.IsSuccessStatusCode)
+            {
+                var user = await JsonSerializer.DeserializeAsync<UserDto>(await userResponse.Content.ReadAsStreamAsync(), JsonOptions);
+                if (user is not null)
+                {
+                    ProfileName.Text = user.Username;
+                    ProfileEmail.Text = user.Email;
+                    ProfileInitial.Text = string.IsNullOrWhiteSpace(user.Username) ? "?" : user.Username[..1].ToUpperInvariant();
+                    if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                    {
+                        var avatarUri = Uri.TryCreate(user.AvatarUrl, UriKind.Absolute, out var absolute)
+                            ? absolute : new Uri(new Uri(_apiBase.TrimEnd('/') + "/"), user.AvatarUrl.TrimStart('/'));
+                        ProfileAvatar.Child = new System.Windows.Controls.Image
+                        {
+                            Source = new BitmapImage(avatarUri),
+                            Stretch = Stretch.UniformToFill
+                        };
+                    }
+                }
+            }
+
+            using var unreadRequest = new HttpRequestMessage(HttpMethod.Get, $"{_apiBase.TrimEnd('/')}/api/notifications/unread-count");
+            unreadRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            using var unreadResponse = await Http.SendAsync(unreadRequest);
+            if (unreadResponse.IsSuccessStatusCode)
+            {
+                var unread = await JsonSerializer.DeserializeAsync<UnreadDto>(await unreadResponse.Content.ReadAsStreamAsync(), JsonOptions);
+                if (unread?.Count > 0)
+                {
+                    UnreadCount.Text = unread.Count.ToString();
+                    UnreadBadge.Visibility = Visibility.Visible;
+                }
+            }
+        }
+        catch { /* Ошибка профиля не должна блокировать главный экран. */ }
     }
 
     private void ProjectSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -150,6 +200,18 @@ public partial class MainWindow : Window
             MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
+    private sealed class UserDto
+    {
+        [JsonPropertyName("username")] public string Username { get; set; } = "";
+        [JsonPropertyName("email")] public string Email { get; set; } = "";
+        [JsonPropertyName("avatar_url")] public string? AvatarUrl { get; set; }
+    }
+
+    private sealed class UnreadDto
+    {
+        [JsonPropertyName("count")] public int Count { get; set; }
+    }
+
     private sealed class ProjectDto
     {
         [JsonPropertyName("id")] public int Id { get; set; }
@@ -174,7 +236,7 @@ public partial class MainWindow : Window
         public Brush CoverBrush { get; }
         public ImageSource? Avatar { get; }
 
-        public ProjectCard(ProjectDto project)
+        public ProjectCard(ProjectDto project, string apiBase)
         {
             Title = project.Title;
             Description = string.IsNullOrWhiteSpace(project.Description) ? "Без описания" : project.Description;
@@ -183,14 +245,14 @@ public partial class MainWindow : Window
             var colors = Gradients[Math.Abs(project.Id % Gradients.Length)].Split('|');
             CoverBrush = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(colors[0]),
                 (Color)ColorConverter.ConvertFromString(colors[1]), 35);
-            if (!string.IsNullOrWhiteSpace(project.AvatarUrl) && Uri.TryCreate(project.AvatarUrl,
-                UriKind.Absolute, out var uri))
+            if (!string.IsNullOrWhiteSpace(project.AvatarUrl))
             {
                 try
                 {
                     var bitmap = new BitmapImage();
                     bitmap.BeginInit();
-                    bitmap.UriSource = uri;
+                    bitmap.UriSource = Uri.TryCreate(project.AvatarUrl, UriKind.Absolute, out var uri)
+                        ? uri : new Uri(new Uri(apiBase.TrimEnd('/') + "/"), project.AvatarUrl.TrimStart('/'));
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
                     bitmap.EndInit();
                     Avatar = bitmap;
