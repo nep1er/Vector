@@ -10,7 +10,7 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Height" Value="38"/>
+            <Setter Property="Height" Value="36"/>
             <Setter Property="Padding" Value="12,0"/>
             <Setter Property="Margin" Value="0,1"/>
             <Setter Property="FontSize" Value="14"/>
@@ -91,9 +91,54 @@
         <!-- Левая панель: размеры и интервалы повторяют Layout/Sidebar Web-клиента. -->
         <Border Grid.Column="0" Background="{StaticResource Brush.Sidebar}">
             <DockPanel LastChildFill="True">
-                <Border DockPanel.Dock="Top" Padding="22,20,22,22">
+                <Border DockPanel.Dock="Top" Padding="22,20,22,18">
                     <Image Source="/Vector.Desktop;component/Resources/Brand/logo.png"
                            Height="32" Stretch="Uniform" HorizontalAlignment="Left"/>
+                </Border>
+
+                <!-- Профиль должен быть отдельным нижним элементом DockPanel.
+                     Последний элемент DockPanel заполняет остаток высоты, поэтому
+                     навигация располагается последней и занимает центральную область. -->
+                <Border DockPanel.Dock="Bottom" Margin="12,0,12,0" Padding="0,12,0,0"
+                        BorderBrush="{StaticResource Brush.SidebarBorder}" BorderThickness="0,1,0,0">
+                    <Button x:Name="ProfileButton" Click="ProfileButton_Click" Background="Transparent"
+                            BorderThickness="0" Padding="8" HorizontalContentAlignment="Stretch"
+                            Foreground="{StaticResource Brush.SidebarText}" Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="ProfileButtonBorder" Background="{TemplateBinding Background}"
+                                        CornerRadius="6">
+                                    <ContentPresenter/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="ProfileButtonBorder" Property="Background"
+                                                Value="{StaticResource Brush.SidebarHover}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="42"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="ProfileAvatar" Width="34" Height="34" CornerRadius="17"
+                                    Background="{StaticResource Brush.Accent}" VerticalAlignment="Center"
+                                    ClipToBounds="True">
+                                <TextBlock x:Name="ProfileInitial" Text="?" Foreground="White"
+                                           FontSize="15" FontWeight="Bold" VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock x:Name="ProfileName" Text="Профиль" FontSize="13"
+                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="ProfileEmail" Text="Настройки и аккаунт" FontSize="11"
+                                           Foreground="{StaticResource Brush.SidebarMuted}"
+                                           TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
                 </Border>
 
                 <StackPanel Margin="12,0,12,16">
@@ -131,40 +176,14 @@
                             <Path Width="18" Height="18" Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" StrokeThickness="1.6" Data="M18,9 C18,5 15,3 12,3 C9,3 6,5 6,9 C6,15 4,16 4,18 L20,18 C20,16 18,15 18,9 M10,21 L14,21"/>
                             <TextBlock Grid.Column="1" Text="Уведомления" VerticalAlignment="Center"/>
                             <Border x:Name="UnreadBadge" Grid.Column="2" Background="{StaticResource Brush.Accent}"
-                                    CornerRadius="10" Padding="6,1" Visibility="Collapsed">
-                                <TextBlock x:Name="UnreadCount" Text="0" Foreground="White" FontSize="11"
+                                    CornerRadius="999" MinWidth="20" Padding="6,0" VerticalAlignment="Center" Visibility="Collapsed">
+                                <TextBlock x:Name="UnreadCount" Text="0" Foreground="White" FontSize="12"
                                            FontWeight="SemiBold"/>
                             </Border>
                         </Grid>
                     </Button>
                 </StackPanel>
 
-                <Border DockPanel.Dock="Bottom" Margin="12,0,12,0" Padding="0,12,0,0"
-                        BorderBrush="{StaticResource Brush.SidebarBorder}" BorderThickness="0,1,0,0">
-                    <Button x:Name="ProfileButton" Click="ProfileButton_Click" Background="Transparent"
-                            BorderThickness="0" Padding="8" HorizontalContentAlignment="Stretch"
-                            Foreground="{StaticResource Brush.SidebarText}" Cursor="Hand">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="42"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border x:Name="ProfileAvatar" Width="34" Height="34" CornerRadius="17"
-                                    Background="{StaticResource Brush.Accent}" VerticalAlignment="Center">
-                                <TextBlock x:Name="ProfileInitial" Text="?" Foreground="White"
-                                           FontSize="15" FontWeight="Bold" VerticalAlignment="Center"
-                                           HorizontalAlignment="Center"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock x:Name="ProfileName" Text="Профиль" FontSize="13"
-                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock x:Name="ProfileEmail" Text="Настройки и аккаунт" FontSize="11"
-                                           Foreground="{StaticResource Brush.SidebarMuted}"
-                                           TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
-                            </StackPanel>
-                        </Grid>
-                    </Button>
-                </Border>
             </DockPanel>
         </Border>
 
