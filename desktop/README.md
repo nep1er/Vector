@@ -1,34 +1,34 @@
 # Vector Desktop (WPF)
 
-This directory contains the native Windows desktop client. It is intentionally isolated from `client/` and `server/`.
+Здесь находится нативный Windows-клиент Vector. Desktop изолирован от Web-клиента `client/` и API-сервера `server/`.
 
-## Current stage
+## Текущее состояние
 
-The first foundation increment includes:
+Первая основа интегрирована непосредственно в Visual Studio WPF-проект:
 
-- A standalone WPF application project at `Vector.Desktop/`.
-- A desktop shell with a 264 px navigation rail and a content area.
-- Initial coffee-light design resources ported from `resources/design/tokens.css`.
-- Placeholder navigation for the primary Web sections.
+- главное окно с боковой навигацией шириной 264 px;
+- пункты «Проекты», «Задачи», «Друзья», «Расширения» и «Уведомления»;
+- переключение заголовка и описания раздела при выборе пункта меню;
+- палитра Coffee Light в `Vector.Desktop/Resources/Colors.CoffeeLight.xaml`, перенесённая из `resources/design/tokens.css`.
 
-The navigation entries are scaffolding, not implemented product screens yet.
+Навигация пока служит каркасом: полноценные экраны и рабочие сценарии будут переноситься постепенно.
 
-## Requirements
+## Требования
 
 - Windows
-- .NET 10 SDK (Windows Desktop workload/reference packs are included with the SDK)
+- .NET 9 SDK (проект использует `net9.0-windows`)
 
-## Run
+## Запуск
 
-From this directory:
+Открой `Vector.Desktop/Vector.Desktop.sln` в Visual Studio или выполни из этой папки:
 
 ```powershell
 dotnet run --project .\Vector.Desktop\Vector.Desktop.csproj
 ```
 
-## Porting rules
+## Правила портирования
 
-- Keep all desktop-specific code under `desktop/`.
-- Do not modify the Web client or API server as part of the desktop port.
-- Treat the Web implementation and shared design tokens as the behavioral and visual reference.
-- Port screens incrementally and verify them against the Web client before calling them complete.
+- Весь Desktop-код хранить внутри `desktop/`.
+- Не менять Web-клиент и API-сервер в рамках портирования.
+- Использовать Web-реализацию и общие дизайн-токены как источник поведения и визуального оформления.
+- Переносить экраны постепенно и сверять каждый с Web-версией до завершения.
