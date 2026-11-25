@@ -108,7 +108,7 @@
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="ProfileButtonBorder" Background="{TemplateBinding Background}"
                                         CornerRadius="6">
-                                    <ContentPresenter/>
+                                    <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
