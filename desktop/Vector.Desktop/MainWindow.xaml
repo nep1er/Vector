@@ -237,6 +237,7 @@
                                        Foreground="{DynamicResource Brush.TextMuted}" FontSize="14"
                                        Margin="0,0,0,16" Visibility="Collapsed"/>
 
+                            <ContentControl x:Name="SectionContent" Visibility="Collapsed"/>
                             <ItemsControl x:Name="ProjectsItems">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -306,7 +307,7 @@
         <Popup x:Name="UserPopup" PlacementTarget="{Binding ElementName=ProfileButton}" Placement="Top" VerticalOffset="-8" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
             <Border Width="240" Padding="6" CornerRadius="8" Background="{DynamicResource Brush.SidebarMenu}" BorderBrush="{DynamicResource Brush.SidebarBorder}" BorderThickness="1">
                 <StackPanel>
-                    <TextBlock Text="{Binding Text, ElementName=ProfileEmail}" Foreground="{DynamicResource Brush.SidebarMuted}" FontSize="14" Margin="10,8,10,10" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="MenuEmail" Foreground="{DynamicResource Brush.SidebarMuted}" FontSize="14" Margin="10,8,10,10" TextTrimming="CharacterEllipsis"/>
                     <Button Style="{StaticResource UserMenuButton}" Click="OpenProfile_Click" Content="♙   Настройки профиля"/>
                     <StackPanel Margin="10,8">
                         <TextBlock Text="◐   Тема" Foreground="{DynamicResource Brush.SidebarText}" FontSize="16" Margin="0,0,0,6"/>
