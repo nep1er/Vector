@@ -24,7 +24,8 @@ internal sealed class VectorApi
         using var request = new HttpRequestMessage(method, BaseUrl + path);
         if (authorized && !string.IsNullOrWhiteSpace(Token))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
-        if (body is not null)
+        if (body is HttpContent raw) request.Content = raw;
+        else if (body is not null)
             request.Content = new StringContent(JsonSerializer.Serialize(body, Json), Encoding.UTF8, "application/json");
         HttpResponseMessage response;
         try { response = await Http.SendAsync(request); }
