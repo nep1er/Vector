@@ -5,13 +5,13 @@ using System.Windows.Media;
 namespace Vector.Desktop.Services;
 internal static class ThemeService
 {
-    private static readonly string[] Keys = { "Background", "Surface", "Surface2", "Hover", "Border", "BorderStrong", "Text", "TextMuted", "Accent", "AccentHover", "Sidebar", "SidebarHover", "SidebarActive", "SidebarText", "SidebarMuted", "SidebarBorder", "Input", "Danger", "SidebarMenu" };
+    private static readonly string[] Keys = { "Background", "Surface", "Surface2", "Hover", "Border", "BorderStrong", "Text", "TextMuted", "Accent", "AccentHover", "Sidebar", "SidebarHover", "SidebarActive", "SidebarText", "SidebarMuted", "SidebarBorder", "Input", "Danger", "SidebarMenu", "TimelineBg", "TimelineGrid", "TimelineRuler", "TimelineToday", "TimelineClipRoadmap", "TimelineClipRoadmapBorder", "TimelineClipTodo", "TimelineClipTodoBorder", "TimelineClipTodoText" };
     private static readonly Dictionary<string, string[]> Themes = new()
     {
-        ["system-light"] = new[] { "#d3b06c", "#efdfb5", "#e6d09a", "#c8a25c", "#b08a48", "#8c6b32", "#261a0c", "#4d391d", "#9b1c1c", "#b32424", "#2a1d0f", "#4d3822", "#5a4228", "#f3e8d0", "#c9b690", "#54402a", "#f7eed3", "#a31616", "#3f2d19" },
-        ["system-dark"] = new[] { "#17120d", "#251e16", "#2f271d", "#3a3025", "#44382a", "#6a5a42", "#f1e8d6", "#cbbd9f", "#b83232", "#cf4242", "#100c08", "#2a2118", "#34291d", "#f3e8d0", "#a89a7c", "#2e2519", "#1d1812", "#e05a5a", "#211a11" },
-        ["light"] = new[] { "#eceef1", "#ffffff", "#f3f4f6", "#e5e7eb", "#d1d5db", "#9ca3af", "#111827", "#4b5563", "#2563eb", "#1d4ed8", "#1f2937", "#374151", "#4b5563", "#f3f4f6", "#9ca3af", "#374151", "#ffffff", "#dc2626", "#2b3646" },
-        ["dark"] = new[] { "#121316", "#1c1e22", "#25282d", "#2f3238", "#363a41", "#555b66", "#e5e7eb", "#b0b6c0", "#3b82f6", "#60a5fa", "#0c0d0f", "#1f2227", "#2a2d34", "#e5e7eb", "#8b93a1", "#24272c", "#16181b", "#f06262", "#181a1e" }
+        ["system-light"] = new[] { "#d3b06c", "#efdfb5", "#e6d09a", "#c8a25c", "#b08a48", "#8c6b32", "#261a0c", "#4d391d", "#9b1c1c", "#b32424", "#2a1d0f", "#4d3822", "#5a4228", "#f3e8d0", "#c9b690", "#54402a", "#f7eed3", "#a31616", "#3f2d19", "#3f2d19", "#46341f", "#c9b690", "#ff6a5a", "#9b1c1c", "#d04a4a", "#c8943a", "#e8b85a", "#1f1408" },
+        ["system-dark"] = new[] { "#17120d", "#251e16", "#2f271d", "#3a3025", "#44382a", "#6a5a42", "#f1e8d6", "#cbbd9f", "#b83232", "#cf4242", "#100c08", "#2a2118", "#34291d", "#f3e8d0", "#a89a7c", "#2e2519", "#1d1812", "#e05a5a", "#211a11", "#1d1710", "#2e2519", "#a89a7c", "#ff6a5a", "#9b1c1c", "#d04a4a", "#c8943a", "#e8b85a", "#1f1408" },
+        ["light"] = new[] { "#eceef1", "#ffffff", "#f3f4f6", "#e5e7eb", "#d1d5db", "#9ca3af", "#111827", "#4b5563", "#2563eb", "#1d4ed8", "#1f2937", "#374151", "#4b5563", "#f3f4f6", "#9ca3af", "#374151", "#ffffff", "#dc2626", "#2b3646", "#f3f4f6", "#e0e3e8", "#6b7280", "#ef4444", "#4b5563", "#374151", "#9ca3af", "#6b7280", "#111827" },
+        ["dark"] = new[] { "#121316", "#1c1e22", "#25282d", "#2f3238", "#363a41", "#555b66", "#e5e7eb", "#b0b6c0", "#3b82f6", "#60a5fa", "#0c0d0f", "#1f2227", "#2a2d34", "#e5e7eb", "#8b93a1", "#24272c", "#16181b", "#f06262", "#181a1e", "#181a1d", "#272a2f", "#8b93a1", "#ff6a5a", "#4b5563", "#6b7280", "#8b93a1", "#b0b6c0", "#0f1114" }
     };
     private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vector", "theme.txt");
     public static string Current { get; private set; } = "system-light";
