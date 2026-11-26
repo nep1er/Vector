@@ -175,13 +175,13 @@ public partial class MainWindow : Window
         SubmitCreateProject.IsEnabled = false;
         try
         {
-            await _api.RequestAsync<ProjectDto>(HttpMethod.Post, "/api/projects", new
+            var created = await _api.RequestAsync<ProjectDto>(HttpMethod.Post, "/api/projects", new
             {
                 title,
                 description = string.IsNullOrWhiteSpace(NewProjectDescription.Text) ? null : NewProjectDescription.Text.Trim()
             });
             CreateOverlay.Visibility = Visibility.Collapsed;
-            await LoadProjectsAsync();
+            OpenProject(created.Id, null);
         }
         catch (ApiException ex) when (ex.Status == 401) { CreateOverlay.Visibility = Visibility.Collapsed; await LogoutAsync(); }
         catch (Exception ex) { CreateError.Text = ex.Message; }
@@ -197,6 +197,7 @@ public partial class MainWindow : Window
         UserPopup.IsOpen = false;
         SectionContent.Content = null;
         SectionContent.Visibility = Visibility.Collapsed;
+        RestoreShell();
         PageTitle.Text = pageName;
         var isProjects = pageName == "Проекты";
         CreateProjectButton.Visibility = isProjects ? Visibility.Visible : Visibility.Collapsed;
@@ -208,9 +209,54 @@ public partial class MainWindow : Window
         if (isProjects) await LoadProjectsAsync();
         else
         {
-            StatusMessage.Text = $"Раздел «{pageName}» будет перенесён отдельным этапом.";
-            StatusMessage.Visibility = Visibility.Visible;
+            StatusMessage.Visibility = Visibility.Collapsed;
+            SectionContent.Content = pageName switch
+            {
+                "Друзья" => new FriendsView(_api, LogoutAsync),
+                "Уведомления" => new NotificationsView(_api, LogoutAsync, LoadProfileAsync),
+                "Задачи" => new TasksView(_api, LogoutAsync, OpenProject),
+                _ => null
+            };
+            SectionContent.Visibility = SectionContent.Content is null ? Visibility.Collapsed : Visibility.Visible;
+            if (SectionContent.Content is null)
+            {
+                StatusMessage.Text = $"Раздел «{pageName}» будет перенесён отдельным этапом.";
+                StatusMessage.Visibility = Visibility.Visible;
+            }
         }
+    }
+
+    private void ProjectCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ProjectCard card }) OpenProject(card.Id, null);
+    }
+
+    private void OpenProject(int id, int? task)
+    {
+        if (id <= 0) return;
+        ++_navigationVersion;
+        UserPopup.IsOpen = false;
+        GlobalSidebar.Visibility = Visibility.Collapsed;
+        SidebarColumn.Width = new GridLength(0);
+        MainContent.Margin = new Thickness(0);
+        PageHeader.Visibility = Visibility.Collapsed;
+        ProjectsItems.Visibility = EmptyState.Visibility = StatusMessage.Visibility = Visibility.Collapsed;
+        SectionContent.Content = new ProjectView(_api, LogoutAsync, id, task, BackToProjects);
+        SectionContent.Visibility = Visibility.Visible;
+    }
+
+    private void RestoreShell()
+    {
+        GlobalSidebar.Visibility = Visibility.Visible;
+        SidebarColumn.Width = new GridLength(264);
+        MainContent.Margin = new Thickness(48,40,48,64);
+        PageHeader.Visibility = Visibility.Visible;
+    }
+
+    private void BackToProjects()
+    {
+        var button = NavigationPanel.Children.OfType<Button>().First(b => Equals(b.CommandParameter, "Проекты"));
+        NavigationButton_Click(button, new RoutedEventArgs());
     }
 
     private void ProfileButton_Click(object sender, RoutedEventArgs e)
@@ -272,6 +318,7 @@ public partial class MainWindow : Window
         CreateOverlay.Visibility = Visibility.Collapsed;
         foreach (var button in NavigationPanel.Children.OfType<Button>())
             button.Tag = Equals(button.CommandParameter, "Проекты") ? "Active" : null;
+        RestoreShell();
         PageTitle.Text = "Проекты";
         ProjectsItems.Visibility = CreateProjectButton.Visibility = Visibility.Visible;
         Hide();
@@ -307,6 +354,7 @@ public partial class MainWindow : Window
             "#8A5A1C|#3A1F0C", "#6B2A2A|#1F1410", "#3F2D19|#17100A"
         ];
 
+        public int Id { get; }
         public string Title { get; }
         public string Description { get; }
         public string Initial { get; }
@@ -316,6 +364,7 @@ public partial class MainWindow : Window
 
         public ProjectCard(ProjectDto project, string apiBase)
         {
+            Id = project.Id;
             Title = project.Title;
             Description = string.IsNullOrWhiteSpace(project.Description) ? "Без описания" : project.Description;
             Initial = project.Title.Trim().FirstOrDefault().ToString().ToUpperInvariant();
