@@ -1,0 +1,49 @@
+<Window x:Class="Vector.Desktop.AuthWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Vector" Width="1100" Height="700" MinWidth="850" MinHeight="550"
+ WindowStartupLocation="CenterScreen" FontFamily="Segoe UI" FontSize="16"
+ Background="{DynamicResource Brush.Background}" Foreground="{DynamicResource Brush.Text}">
+ <Window.Resources>
+  <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource Brush.Input}"/><Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/><Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/><Setter Property="Padding" Value="12,8"/><Setter Property="Height" Value="42"/></Style>
+  <Style TargetType="PasswordBox"><Setter Property="Background" Value="{DynamicResource Brush.Input}"/><Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/><Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/><Setter Property="Padding" Value="12,8"/><Setter Property="Height" Value="42"/></Style>
+ </Window.Resources>
+ <Grid>
+  <Grid.ColumnDefinitions><ColumnDefinition Width="5*" MinWidth="340"/><ColumnDefinition Width="6*"/></Grid.ColumnDefinitions>
+  <Grid Margin="0">
+   <Grid.Background><RadialGradientBrush Center="0,0" GradientOrigin="0,0" RadiusX="1.2" RadiusY=".8"><GradientStop Color="#6B1D16" Offset="0"/><GradientStop Color="#2A1D0F" Offset=".62"/></RadialGradientBrush></Grid.Background>
+   <Grid Margin="48,40">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Image Source="/Vector.Desktop;component/Resources/Brand/logo.png" Height="40" HorizontalAlignment="Left"/>
+    <StackPanel Grid.Row="1" VerticalAlignment="Center">
+     <TextBlock Text="Планы на любой срок, работа — на доске" FontSize="38" FontWeight="Bold" TextWrapping="Wrap" Foreground="{DynamicResource Brush.SidebarText}"/>
+     <TextBlock Margin="0,16,0,0" Text="Дорожная карта без ограничений по времени и привычные канбан-доски для текущих задач — в одном месте." TextWrapping="Wrap" Foreground="{DynamicResource Brush.SidebarMuted}"/>
+    </StackPanel>
+    <StackPanel Grid.Row="2">
+     <Border Background="#38000000" CornerRadius="4" Height="24" Margin="0,0,0,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38*"/><ColumnDefinition Width="62*"/></Grid.ColumnDefinitions><Border Background="#9B1C1C" Margin="0,3" CornerRadius="3"/></Grid></Border>
+     <Border Background="#38000000" CornerRadius="4" Height="24" Margin="0,0,0,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="30*"/><ColumnDefinition Width="42*"/><ColumnDefinition Width="28*"/></Grid.ColumnDefinitions><Border Grid.Column="1" Background="#C8943A" Margin="0,3" CornerRadius="3"/></Grid></Border>
+     <Border Background="#38000000" CornerRadius="4" Height="24" Margin="0,0,0,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="12*"/><ColumnDefinition Width="30*"/><ColumnDefinition Width="58*"/></Grid.ColumnDefinitions><Border Grid.Column="1" Background="#C8943A" Margin="0,3" CornerRadius="3"/></Grid></Border>
+     <Border Background="#38000000" CornerRadius="4" Height="24"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="52*"/><ColumnDefinition Width="40*"/><ColumnDefinition Width="8*"/></Grid.ColumnDefinitions><Border Grid.Column="1" Background="#9B1C1C" Margin="0,3" CornerRadius="3"/></Grid></Border>
+    </StackPanel>
+   </Grid>
+  </Grid>
+  <Grid Grid.Column="1" Margin="24,32">
+   <StackPanel Width="380" HorizontalAlignment="Center" VerticalAlignment="Center">
+    <TextBlock x:Name="Heading" Text="Вход в Vector" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,24"/>
+    <StackPanel x:Name="UsernameField" Visibility="Collapsed" Margin="0,0,0,16">
+     <TextBlock Text="Имя пользователя" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+     <TextBox x:Name="UsernameInput" MaxLength="50"/>
+    </StackPanel>
+    <TextBlock Text="Email" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+    <TextBox x:Name="EmailInput" Margin="0,0,0,16"/>
+    <TextBlock Text="Пароль" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+    <PasswordBox x:Name="PasswordInput" Margin="0,0,0,16"/>
+    <TextBlock x:Name="ErrorText" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" Margin="0,0,0,12" Visibility="Collapsed"/>
+    <Button x:Name="SubmitButton" Content="Войти" Click="Submit_Click" IsDefault="True" Height="42" Background="{DynamicResource Brush.Accent}" Foreground="White" FontWeight="SemiBold" BorderThickness="0" Cursor="Hand">
+     <Button.Template><ControlTemplate TargetType="Button"><Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="6"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bg" Property="Background" Value="{DynamicResource Brush.AccentHover}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bg" Property="Opacity" Value=".5"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Button.Template>
+    </Button>
+    <Button x:Name="SwitchButton" Content="Нет аккаунта? Зарегистрироваться" Click="Switch_Click" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Brush.Accent}" Margin="0,18,0,0" Cursor="Hand"/>
+   </StackPanel>
+  </Grid>
+ </Grid>
+</Window>

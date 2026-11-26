@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Vector.Desktop</RootNamespace>
+    <AssemblyName>Vector.Desktop</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\resources\brand\logo.png" Link="Assets\logo.png" Condition="Exists('..\..\resources\brand\logo.png')" />
+  </ItemGroup>
+
+</Project>
