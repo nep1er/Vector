@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Vector.Desktop.Services;
+using Vector.Desktop.Controls;
 
 namespace Vector.Desktop;
 
@@ -24,6 +25,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        ThemeService.Load();
         InitializeComponent();
         ProjectsItems.ItemsSource = _projects;
         Loaded += async (_, _) => { Hide(); await InitializeSessionAsync(); };
@@ -78,9 +80,10 @@ public partial class MainWindow : Window
     {
         ProfileName.Text = user.Username;
         ProfileEmail.Text = user.Email;
+        MenuEmail.Text = user.Email;
         ProfileInitial.Text = string.IsNullOrWhiteSpace(user.Username) ? "?" : user.Username[..1].ToUpperInvariant();
         ProfileAvatar.Child = ProfileInitial;
-        ProfileAvatar.Background = (Brush)FindResource("Brush.Accent");
+        ProfileAvatar.SetResourceReference(Border.BackgroundProperty, "Brush.Accent");
         if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
         {
             try
@@ -92,7 +95,7 @@ public partial class MainWindow : Window
             }
             catch { }
         }
-        else ProfileAvatar.Background = (Brush)FindResource("Brush.Accent");
+        else ProfileAvatar.SetResourceReference(Border.BackgroundProperty, "Brush.Accent");
     }
 
     private async Task LoadProjectsAsync()
@@ -191,6 +194,9 @@ public partial class MainWindow : Window
         foreach (var button in NavigationPanel.Children.OfType<Button>())
             button.Tag = ReferenceEquals(button, selected) ? "Active" : null;
         ++_navigationVersion;
+        UserPopup.IsOpen = false;
+        SectionContent.Content = null;
+        SectionContent.Visibility = Visibility.Collapsed;
         PageTitle.Text = pageName;
         var isProjects = pageName == "Проекты";
         CreateProjectButton.Visibility = isProjects ? Visibility.Visible : Visibility.Collapsed;
@@ -209,26 +215,42 @@ public partial class MainWindow : Window
 
     private void ProfileButton_Click(object sender, RoutedEventArgs e)
     {
-        var menu = new ContextMenu
+        if (UserPopup.IsOpen) { UserPopup.IsOpen = false; return; }
+        UpdateThemeButtons();
+        UserPopup.IsOpen = true;
+    }
+
+    private void UpdateThemeButtons()
+    {
+        foreach (var button in ThemeButtons.Children.OfType<Button>())
+            button.Tag = Equals(button.CommandParameter, ThemeService.Current) ? "Active" : null;
+    }
+
+    private void Theme_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { CommandParameter: string id })
         {
-            PlacementTarget = ProfileButton,
-            Placement = System.Windows.Controls.Primitives.PlacementMode.Top,
-            Background = new SolidColorBrush(Color.FromRgb(63,45,25)),
-            Foreground = (Brush)FindResource("Brush.SidebarText"),
-            Width = ProfileButton.ActualWidth
-        };
-        menu.Items.Add(new MenuItem { Header = ProfileEmail.Text, IsEnabled = false });
-        var profile = new MenuItem { Header = "Настройки профиля" };
-        profile.Click += (_, _) => MessageBox.Show("Редактирование профиля будет перенесено отдельным этапом.", "Vector");
-        menu.Items.Add(profile);
-        menu.Items.Add(new MenuItem { Header = "Тема — скоро", IsEnabled = false });
-        menu.Items.Add(new MenuItem { Header = "Язык — скоро", IsEnabled = false });
-        menu.Items.Add(new MenuItem { Header = "Помощь — скоро", IsEnabled = false });
-        menu.Items.Add(new Separator());
-        var logout = new MenuItem { Header = "Выйти" };
-        logout.Click += async (_, _) => await LogoutAsync();
-        menu.Items.Add(logout);
-        menu.IsOpen = true;
+            ThemeService.Apply(id);
+            UpdateThemeButtons();
+        }
+    }
+
+    private void OpenProfile_Click(object sender, RoutedEventArgs e)
+    {
+        UserPopup.IsOpen = false;
+        ++_navigationVersion;
+        foreach (var button in NavigationPanel.Children.OfType<Button>()) button.Tag = null;
+        PageTitle.Text = "Настройки профиля";
+        ProjectsSummary.Text = "";
+        ProjectSearch.Visibility = SearchPlaceholder.Visibility = CreateProjectButton.Visibility = ProjectsItems.Visibility = EmptyState.Visibility = StatusMessage.Visibility = Visibility.Collapsed;
+        SectionContent.Content = new ProfileView(_api, LoadProfileAsync, LogoutAsync);
+        SectionContent.Visibility = Visibility.Visible;
+    }
+
+    private async void Logout_Click(object sender, RoutedEventArgs e)
+    {
+        UserPopup.IsOpen = false;
+        await LogoutAsync();
     }
 
     private async Task LogoutAsync()
@@ -238,8 +260,11 @@ public partial class MainWindow : Window
         _api.Token = null;
         ++_navigationVersion;
         _projects.Clear();
+        UserPopup.IsOpen = false;
+        SectionContent.Content = null;
+        SectionContent.Visibility = Visibility.Collapsed;
         ProfileAvatar.Child = ProfileInitial;
-        ProfileAvatar.Background = (Brush)FindResource("Brush.Accent");
+        ProfileAvatar.SetResourceReference(Border.BackgroundProperty, "Brush.Accent");
         ProfileInitial.Text = "?";
         ProfileName.Text = "";
         ProfileEmail.Text = "";
