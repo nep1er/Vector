@@ -193,10 +193,25 @@ public partial class MainWindow : Window
         finally { SubmitCreateProject.IsEnabled = true; }
     }
 
-    private void NavigationButton_Click(object sender, RoutedEventArgs e)
+    private async void NavigationButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: string pageName } && pageName != "Active")
+        if (sender is not Button { CommandParameter: string pageName } selected) return;
+        foreach (var button in NavigationPanel.Children.OfType<Button>())
+            button.Tag = ReferenceEquals(button, selected) ? "Active" : null;
+        PageTitle.Text = pageName;
+        var isProjects = pageName == "Проекты";
+        CreateProjectButton.Visibility = isProjects ? Visibility.Visible : Visibility.Collapsed;
+        ProjectsItems.Visibility = isProjects ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = Visibility.Collapsed;
+        ProjectSearch.Visibility = Visibility.Collapsed;
+        SearchPlaceholder.Visibility = Visibility.Collapsed;
+        ProjectsSummary.Text = string.Empty;
+        if (isProjects) await LoadProjectsAsync();
+        else
+        {
             StatusMessage.Text = $"Раздел «{pageName}» будет перенесён отдельным этапом.";
+            StatusMessage.Visibility = Visibility.Visible;
+        }
     }
 
     private void ProfileButton_Click(object sender, RoutedEventArgs e)
