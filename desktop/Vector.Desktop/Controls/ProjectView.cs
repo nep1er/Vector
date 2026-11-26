@@ -148,7 +148,7 @@ internal sealed class ProjectView : SectionView
         var parentId = N(_current, "parent_roadmap_id");
         if (parentId > 0)
             actions.Children.Add(Button("←  Родительский этап", () => Run(() => Load(parentId, null))));
-        _filterButton = Button(FilterLabel(), () => { if (_filterPopup != null) _filterPopup.IsOpen = !_filterPopup.IsOpen; });
+        _filterButton = Button(FilterLabel(), () => { if (_filterPopup != null) _filterPopup.IsOpen = !_filterPopup.IsOpen; return Task.CompletedTask; });
         _filterButton.Margin = new Thickness(0, 0, 8, 0);
         actions.Children.Add(_filterButton);
         if (Can("EXECUTE") || Can("WRITE"))
