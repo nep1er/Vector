@@ -92,12 +92,12 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="264"/>
+            <ColumnDefinition x:Name="SidebarColumn" Width="264"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- Левая панель: размеры и интервалы повторяют Layout/Sidebar Web-клиента. -->
-        <Border Grid.Column="0" Background="{DynamicResource Brush.Sidebar}">
+        <Border x:Name="GlobalSidebar" Grid.Column="0" Background="{DynamicResource Brush.Sidebar}">
             <DockPanel LastChildFill="True">
                 <Border DockPanel.Dock="Top" Padding="22,20,22,18">
                     <Image Source="/Vector.Desktop;component/Resources/Brand/logo.png"
@@ -203,9 +203,9 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Grid Margin="48,40,48,64">
+                    <Grid x:Name="MainContent" Margin="48,40,48,64">
                         <StackPanel>
-                            <Grid Margin="0,0,0,24">
+                            <Grid x:Name="PageHeader" Margin="0,0,0,24">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -246,7 +246,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{DynamicResource Brush.Surface}"
+                                        <Border MouseLeftButtonUp="ProjectCard_Click" Cursor="Hand" Background="{DynamicResource Brush.Surface}"
                                                 BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
                                                 CornerRadius="8" MinHeight="260" ClipToBounds="True">
                                             <Grid>
