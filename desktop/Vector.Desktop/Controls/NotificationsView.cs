@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Vector.Desktop.Services;
 
 namespace Vector.Desktop.Controls;
@@ -11,16 +12,18 @@ internal sealed class NotificationsView : SectionView
     private string _folder="main";
     private readonly Func<Task> _refresh;
     private readonly StackPanel _list=new();
-    private readonly Button _main,_hidden;
+    private readonly Button _main,_hidden,_readAll;
     internal NotificationsView(VectorApi api,Func<Task> logout,Func<Task> refresh):base(api,logout)
     {
         _refresh=refresh;
-        var bar=new WrapPanel{Margin=new Thickness(0,0,0,16)};
+        var bar=new DockPanel{Margin=new Thickness(0,0,0,20)};
+        var actions=new StackPanel{Orientation=Orientation.Horizontal};DockPanel.SetDock(actions,Dock.Right);bar.Children.Add(actions);
+        _readAll=Button("✓  Прочитать все",()=>Act(()=>Post("/api/notifications/read-all?folder="+_folder)));_readAll.Margin=new Thickness(0,0,10,0);actions.Children.Add(_readAll);
+        actions.Children.Add(Button("⚙  Настройки",()=>Run(Settings)));
+        var tabs=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Left};
         _main=Button("Основные",()=>Select("main"),true);_hidden=Button("Скрытые",()=>Select("hidden"));
-        bar.Children.Add(_main);bar.Children.Add(_hidden);
-        bar.Children.Add(Button("Прочитать все",()=>Act(()=>Post("/api/notifications/read-all?folder="+_folder))));
-        bar.Children.Add(Button("Настройки",()=>Run(Settings)));
-        Body.Children.Add(bar);Body.Children.Add(_list);
+        tabs.Children.Add(_main);tabs.Children.Add(_hidden);bar.Children.Add(tabs);
+        Body.Children.Add(bar);_list.MaxWidth=1100;_list.HorizontalAlignment=HorizontalAlignment.Stretch;Body.Children.Add(_list);
         Loaded+=async(_,_)=>await Run(Load);
     }
     private Task Select(string folder)=>Run(async()=>{_folder=folder;await Load();});
@@ -34,15 +37,16 @@ internal sealed class NotificationsView : SectionView
         foreach(var b in new[]{_main,_hidden})
         {
             bool selected=b==(_folder=="main"?_main:_hidden);
-            b.SetResourceReference(BackgroundProperty,selected?"Brush.Accent":"Brush.Surface");
+            b.SetResourceReference(BackgroundProperty,selected?"Brush.Accent":"Brush.Input");
             if(selected)b.Foreground=System.Windows.Media.Brushes.White;else b.SetResourceReference(ForegroundProperty,"Brush.Text");
         }
+        _readAll.Visibility=rows.Any(n=>!B(n,"is_read"))?Visibility.Visible:Visibility.Collapsed;
         _list.Children.Clear();
-        if(rows.Length==0){_list.Children.Add(Panel(Text(_folder=="main"?"Нет уведомлений":"В скрытых пусто",20,true)));return;}
+        if(rows.Length==0){var empty=new StackPanel{Margin=new Thickness(0,32,0,32)};var title=Text(_folder=="main"?"Нет уведомлений":"В скрытых пусто",20,true);title.TextAlignment=TextAlignment.Center;empty.Children.Add(title);if(_folder=="main"){var hint=Muted("Менее важные категории можно убрать в «Скрытые» в настройках.");hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);}_list.Children.Add(Panel(empty));return;}
         var urgent=rows.Where(Actionable).ToArray();
-        if(urgent.Length>0){_list.Children.Add(Text("Требуют ответа",20,true));foreach(var n in urgent)Add(n);}
+        if(urgent.Length>0){var head=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,10)};head.Children.Add(Text("Требуют ответа",18,true));var chip=Chip(urgent.Length.ToString());chip.Margin=new Thickness(8,0,0,0);head.Children.Add(chip);_list.Children.Add(head);foreach(var n in urgent)Add(n);_list.Children.Add(new Border{Height=18});}
         foreach(var group in rows.Where(n=>!Actionable(n)).GroupBy(n=>Day(S(n,"created_at"))))
-        { _list.Children.Add(Text(group.Key,18,true));foreach(var n in group)Add(n); }
+        { var day=Muted(group.Key.ToUpperInvariant(),13);day.FontWeight=FontWeights.SemiBold;day.Margin=new Thickness(0,8,0,8);_list.Children.Add(day);foreach(var n in group)Add(n); }
     }
     private static string Day(string iso)
     { if(!DateTime.TryParse(iso,out var d))return "";var local=d.ToLocalTime().Date;return local==DateTime.Today?"Сегодня":local==DateTime.Today.AddDays(-1)?"Вчера":local.ToString("d MMMM yyyy",CultureInfo.GetCultureInfo("ru-RU")); }
@@ -73,10 +77,23 @@ internal sealed class NotificationsView : SectionView
             actions.Add(Button("Принять",()=>Act(async()=>{await Post(path+"/accept");return await Read(id);}),true));
             actions.Add(Button("Отклонить",()=>Act(async()=>{if(friend)await Delete(path);else await Post(path+"/decline");return await Read(id);})));
         }
-        if(!B(n,"is_read"))actions.Add(Button("✓",()=>Act(()=>Read(id))));
-        actions.Add(Button("×",()=>Act(()=>Delete($"/api/notifications/{id}"))));
+        if(!B(n,"is_read"))actions.Add(IconAction("✓","Отметить прочитанным",()=>Act(()=>Read(id))));
+        actions.Add(IconAction("×","Удалить уведомление",()=>Act(()=>Delete($"/api/notifications/{id}"))));
         string time=DateTime.TryParse(S(n,"created_at"),out var date)?date.ToLocalTime().ToString("dd.MM.yyyy HH:mm"):"";
-        var box=Panel(Row((B(n,"is_read")?"":"● ")+Describe(n),time,actions.ToArray()));if(!B(n,"is_read"))box.SetResourceReference(Border.BorderBrushProperty,"Brush.Accent");_list.Children.Add(box);
+        bool urgent=Actionable(n),unread=!B(n,"is_read");
+        var dock=new DockPanel();var buttons=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};foreach(var action in actions){action.Margin=new Thickness(8,0,0,0);buttons.Children.Add(action);}DockPanel.SetDock(buttons,Dock.Right);dock.Children.Add(buttons);
+        if(urgent){var icon=new Border{Width=40,Height=40,Margin=new Thickness(0,0,12,0),Child=new TextBlock{Text=S(n,"type")=="FRIEND_REQUEST"?"♙+":"▱",Foreground=Brushes.White,FontSize=22,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};icon.SetResourceReference(Border.BackgroundProperty,"Brush.Accent");DockPanel.SetDock(icon,Dock.Left);dock.Children.Add(icon);}
+        var labels=new StackPanel{VerticalAlignment=VerticalAlignment.Center};labels.Children.Add(Text(Describe(n),16,urgent));
+        var meta=new StackPanel{Orientation=Orientation.Horizontal};var cat=S(n,"category");var (label,color)=cat switch{"ROADMAP"=>("Изменения на доске","#4A8FD6"),"TODO"=>("Изменения в ToDo","#D9A21B"),"CARD"=>("Мои карточки","#2F9E5B"),"SYSTEM"=>("Расширения и модерация","#8A63D2"),_=>("Приглашения","")};
+        if(!urgent){var category=Text(label,14,true);if(color=="")category.SetResourceReference(TextBlock.ForegroundProperty,"Brush.Accent");else category.Foreground=Paint(color);category.Margin=new Thickness(0,0,8,0);meta.Children.Add(category);}
+        meta.Children.Add(Muted(time,14));labels.Children.Add(meta);dock.Children.Add(labels);
+        var frame=new Border{CornerRadius=new CornerRadius(8),BorderThickness=new Thickness(1),Margin=new Thickness(0,0,0,10)};frame.SetResourceReference(Border.BorderBrushProperty,"Brush.Border");frame.SetResourceReference(Border.BackgroundProperty,unread?"Brush.Input":"Brush.Surface");
+        var inner=new DockPanel();if(unread||urgent){var marker=new Border{Width=4,CornerRadius=new CornerRadius(7,0,0,7)};marker.SetResourceReference(Border.BackgroundProperty,"Brush.Accent");DockPanel.SetDock(marker,Dock.Left);inner.Children.Add(marker);}
+        inner.Children.Add(new Border{Padding=urgent?new Thickness(18,16,18,16):new Thickness(16,12,16,12),Child=dock});frame.Child=inner;_list.Children.Add(frame);
+    }
+    private static Button IconAction(string symbol,string hint,Func<Task> action)
+    {
+        var b=Button(symbol,action);b.ToolTip=hint;b.Width=34;b.Height=34;b.Padding=new Thickness(0);b.BorderThickness=new Thickness(0);b.Background=Brushes.Transparent;return b;
     }
     private async Task Settings()
     {
