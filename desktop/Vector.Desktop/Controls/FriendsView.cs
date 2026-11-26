@@ -13,7 +13,7 @@ internal sealed class FriendsView : SectionView
     private readonly TextBlock _heading=Text("Мои друзья",17,true),_inHeading=Text("Входящие заявки",17,true),_outHeading=Text("Отправленные",17,true);
     internal FriendsView(VectorApi api,Func<Task> logout):base(api,logout)
     {
-        var add=new DockPanel{MaxHorizontalAlignment=HorizontalAlignment.Left,Width=720,Margin=new Thickness(0,0,0,20)};
+        var add=new DockPanel{MaxWidth=720,HorizontalAlignment=HorizontalAlignment.Left,Width=720,Margin=new Thickness(0,0,0,20)};
         var send=Button("Добавить в друзья",()=>Run(async()=>{var identifier=_identifier.Text.Trim();if(identifier.Length==0)return;await Post("/api/friends/requests",new{identifier});_identifier.Clear();await Load();Notice.Text="Заявка отправлена";Notice.SetResourceReference(TextBlock.ForegroundProperty,"Brush.Text");Notice.Visibility=Visibility.Visible;}),true);
         send.IsEnabled=false;_identifier.TextChanged+=(_,_)=>send.IsEnabled=!string.IsNullOrWhiteSpace(_identifier.Text);
         send.Margin=new Thickness(12,0,0,0);DockPanel.SetDock(send,Dock.Right);add.Children.Add(send);add.Children.Add(_identifier);Body.Children.Add(add);
