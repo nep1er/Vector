@@ -62,7 +62,7 @@ internal sealed class ProjectView : SectionView
             var node=t;
             tree.Children.Add(Row(S(t,"title"),S(t,"type")+" · "+Date(S(t,"start_date"))+" — "+Date(S(t,"end_date")),Button("Открыть",()=>{_current=node;Render();return Task.CompletedTask;})));
             var track=new Grid{Height=24,Margin=new Thickness(0,0,0,10)};
-            track.SetResourceReference(BackgroundProperty,"Brush.Surface2");
+            track.SetResourceReference(System.Windows.Controls.Panel.BackgroundProperty,"Brush.Surface2");
             if(DateTime.TryParse(S(_current,"start_date"),out var start)&&DateTime.TryParse(S(_current,"end_date"),out var end)&&DateTime.TryParse(S(t,"start_date"),out var a)&&DateTime.TryParse(S(t,"end_date"),out var b)&&end>start)
             {
                 double left=Math.Clamp((a-start).TotalDays/(end-start).TotalDays,0,1),right=Math.Clamp((b-start).TotalDays/(end-start).TotalDays,left,1);
