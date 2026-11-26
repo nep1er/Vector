@@ -24,7 +24,7 @@ internal sealed class FriendsView : SectionView
         var grid=new Grid();grid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(3,GridUnitType.Star)});grid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(2,GridUnitType.Star)});
         var left=new StackPanel{Margin=new Thickness(0,0,24,0)};var right=new StackPanel();Grid.SetColumn(right,1);grid.Children.Add(left);grid.Children.Add(right);
         var friends=new StackPanel();friends.Children.Add(Text("Мои друзья",20,true));
-        if(_search.Parent is Panel old)old.Children.Remove(_search);friends.Children.Add(_search);
+        if(_search.Parent is System.Windows.Controls.Panel old)old.Children.Remove(_search);friends.Children.Add(_search);
         var accepted=_rows.Where(r=>S(r,"status")=="ACCEPTED"&&(S(r,"username")+" "+S(r,"email")).Contains(_search.Text.Trim(),StringComparison.CurrentCultureIgnoreCase)).ToArray();
         foreach(var r in accepted)friends.Children.Add(Row(S(r,"username"),S(r,"email"),Button("Удалить",async()=>{if(MessageBox.Show("Удалить из друзей?","Vector",MessageBoxButton.YesNo)==MessageBoxResult.Yes)await Act("/api/friends/"+N(r,"id"));})));
         if(accepted.Length==0)friends.Children.Add(Text("Пока никого или ничего не найдено.",14));left.Children.Add(Panel(friends));
