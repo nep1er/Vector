@@ -10,74 +10,115 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Vector.Desktop.Services;
 
 namespace Vector.Desktop;
 
 public partial class MainWindow : Window
 {
-    private static readonly HttpClient Http = new();
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly ObservableCollection<ProjectCard> _projects = [];
-    private readonly string _apiBase = Environment.GetEnvironmentVariable("VECTOR_API_URL") ?? "http://localhost:5000";
-    private string? _token;
+    private readonly VectorApi _api = new();
+    private string _apiBase => _api.BaseUrl;
+    private bool _sessionBusy;
+    private int _navigationVersion;
 
     public MainWindow()
     {
         InitializeComponent();
         ProjectsItems.ItemsSource = _projects;
-        _token = Environment.GetEnvironmentVariable("VECTOR_TOKEN") ?? ReadLocalToken();
-        Loaded += async (_, _) =>
-        {
-            await LoadProjectsAsync();
-            await LoadProfileAsync();
-        };
+        Loaded += async (_, _) => { Hide(); await InitializeSessionAsync(); };
     }
 
-    private static string? ReadLocalToken()
+    private async Task InitializeSessionAsync()
     {
+        if (_sessionBusy) return;
+        _sessionBusy = true;
         try
         {
-            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Vector", "session.json");
-            if (!File.Exists(path)) return null;
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
-            return document.RootElement.TryGetProperty("token", out var token) ? token.GetString() : null;
+            _api.Token = SessionStore.Load();
+            while (true)
+            {
+                if (!string.IsNullOrWhiteSpace(_api.Token))
+                {
+                    try
+                    {
+                        var user = await _api.RequestAsync<UserDto>(HttpMethod.Get, "/api/auth/me");
+                        ApplyProfile(user);
+                        break;
+                    }
+                    catch (ApiException ex) when (ex.Status == 401)
+                    {
+                        SessionStore.Clear();
+                        _api.Token = null;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (MessageBox.Show(ex.Message + "\nПовторить подключение?", "Vector", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                            continue;
+                        Close();
+                        return;
+                    }
+                }
+                var auth = new AuthWindow(_api);
+                if (auth.ShowDialog() != true) { Close(); return; }
+            }
+            Show();
+            await LoadProjectsAsync();
+            await LoadProfileAsync();
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Vector", MessageBoxButton.OK, MessageBoxImage.Error);
+            Close();
+        }
+        finally { _sessionBusy = false; }
+    }
+
+    private void ApplyProfile(UserDto user)
+    {
+        ProfileName.Text = user.Username;
+        ProfileEmail.Text = user.Email;
+        ProfileInitial.Text = string.IsNullOrWhiteSpace(user.Username) ? "?" : user.Username[..1].ToUpperInvariant();
+        ProfileAvatar.Child = ProfileInitial;
+        ProfileAvatar.Background = (Brush)FindResource("Brush.Accent");
+        if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+        {
+            try
+            {
+                var uri = Uri.TryCreate(user.AvatarUrl, UriKind.Absolute, out var absolute) ? absolute : new Uri(new Uri(_apiBase + "/"), user.AvatarUrl.TrimStart('/'));
+                var image = new BitmapImage(uri);
+                ProfileAvatar.Child = null;
+                ProfileAvatar.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+            }
+            catch { }
+        }
+        else ProfileAvatar.Background = (Brush)FindResource("Brush.Accent");
     }
 
     private async Task LoadProjectsAsync()
     {
+        int version = ++_navigationVersion;
         ProjectsItems.ItemsSource = _projects;
         _projects.Clear();
         EmptyState.Visibility = Visibility.Collapsed;
         StatusMessage.Visibility = Visibility.Visible;
-        StatusMessage.Text = _token is null
-            ? "Для загрузки проектов задайте токен Vector в %AppData%\\Vector\\session.json."
-            : "Загрузка проектов…";
-
-        if (string.IsNullOrWhiteSpace(_token)) return;
-
+        StatusMessage.Text = "Загрузка проектов…";
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_apiBase.TrimEnd('/')}/api/projects");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var response = await Http.SendAsync(request);
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                throw new InvalidOperationException("Сессия истекла. Обновите токен авторизации.");
-            response.EnsureSuccessStatusCode();
-            var projects = await JsonSerializer.DeserializeAsync<List<ProjectDto>>(
-                await response.Content.ReadAsStreamAsync(), JsonOptions) ?? [];
-            foreach (var project in projects)
-                _projects.Add(new ProjectCard(project, _apiBase));
-            ProjectsSummary.Text = _projects.Count > 0 ? $"Всего проектов: {_projects.Count}" : string.Empty;
+            var projects = await _api.RequestAsync<List<ProjectDto>>(HttpMethod.Get, "/api/projects");
+            if (version != _navigationVersion) return;
+            foreach (var project in projects) _projects.Add(new ProjectCard(project, _apiBase));
+            ProjectsSummary.Text = _projects.Count > 0 ? $"Всего проектов: {_projects.Count}" : "";
+            ProjectSearch.Text = "";
             ProjectSearch.Visibility = _projects.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            SearchPlaceholder.Visibility = _projects.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            SearchPlaceholder.Visibility = ProjectSearch.Visibility;
             StatusMessage.Visibility = Visibility.Collapsed;
             EmptyState.Visibility = _projects.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
+        catch (ApiException ex) when (ex.Status == 401) { await LogoutAsync(); }
         catch (Exception ex)
         {
+            if (version != _navigationVersion) return;
             StatusMessage.Text = $"Не удалось загрузить проекты: {ex.Message}";
             StatusMessage.Visibility = Visibility.Visible;
         }
@@ -85,47 +126,15 @@ public partial class MainWindow : Window
 
     private async Task LoadProfileAsync()
     {
-        if (string.IsNullOrWhiteSpace(_token)) return;
         try
         {
-            using var userRequest = new HttpRequestMessage(HttpMethod.Get, $"{_apiBase.TrimEnd('/')}/api/auth/me");
-            userRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var userResponse = await Http.SendAsync(userRequest);
-            if (userResponse.IsSuccessStatusCode)
-            {
-                var user = await JsonSerializer.DeserializeAsync<UserDto>(await userResponse.Content.ReadAsStreamAsync(), JsonOptions);
-                if (user is not null)
-                {
-                    ProfileName.Text = user.Username;
-                    ProfileEmail.Text = user.Email;
-                    ProfileInitial.Text = string.IsNullOrWhiteSpace(user.Username) ? "?" : user.Username[..1].ToUpperInvariant();
-                    if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
-                    {
-                        var avatarUri = Uri.TryCreate(user.AvatarUrl, UriKind.Absolute, out var absolute)
-                            ? absolute : new Uri(new Uri(_apiBase.TrimEnd('/') + "/"), user.AvatarUrl.TrimStart('/'));
-                        ProfileAvatar.Child = new System.Windows.Controls.Image
-                        {
-                            Source = new BitmapImage(avatarUri),
-                            Stretch = Stretch.UniformToFill
-                        };
-                    }
-                }
-            }
-
-            using var unreadRequest = new HttpRequestMessage(HttpMethod.Get, $"{_apiBase.TrimEnd('/')}/api/notifications/unread-count");
-            unreadRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var unreadResponse = await Http.SendAsync(unreadRequest);
-            if (unreadResponse.IsSuccessStatusCode)
-            {
-                var unread = await JsonSerializer.DeserializeAsync<UnreadDto>(await unreadResponse.Content.ReadAsStreamAsync(), JsonOptions);
-                if (unread?.Count > 0)
-                {
-                    UnreadCount.Text = unread.Count.ToString();
-                    UnreadBadge.Visibility = Visibility.Visible;
-                }
-            }
+            ApplyProfile(await _api.RequestAsync<UserDto>(HttpMethod.Get, "/api/auth/me"));
+            var unread = await _api.RequestAsync<UnreadDto>(HttpMethod.Get, "/api/notifications/unread-count");
+            UnreadCount.Text = unread.Count.ToString();
+            UnreadBadge.Visibility = unread.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
-        catch { /* Ошибка профиля не должна блокировать главный экран. */ }
+        catch (ApiException ex) when (ex.Status == 401) { await LogoutAsync(); }
+        catch { UnreadBadge.Visibility = Visibility.Collapsed; }
     }
 
     private void ProjectSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -160,35 +169,18 @@ public partial class MainWindow : Window
         var title = NewProjectTitle.Text.Trim();
         if (title.Length == 0) { CreateError.Text = "Введите название проекта"; return; }
         if (title.Length > 150) { CreateError.Text = "Название не должно быть длиннее 150 символов"; return; }
-        if (string.IsNullOrWhiteSpace(_token))
-        {
-            CreateError.Text = "Сначала настройте токен авторизации Vector.";
-            return;
-        }
-
         SubmitCreateProject.IsEnabled = false;
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_apiBase.TrimEnd('/')}/api/projects")
+            await _api.RequestAsync<ProjectDto>(HttpMethod.Post, "/api/projects", new
             {
-                Content = new StringContent(JsonSerializer.Serialize(new
-                {
-                    title,
-                    description = string.IsNullOrWhiteSpace(NewProjectDescription.Text) ? null : NewProjectDescription.Text.Trim()
-                }), Encoding.UTF8, "application/json")
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var response = await Http.SendAsync(request);
-            var body = await response.Content.ReadAsStringAsync();
-            if (!response.IsSuccessStatusCode)
-            {
-                var message = "Не удалось создать проект.";
-                try { message = JsonDocument.Parse(body).RootElement.GetProperty("message").GetString() ?? message; } catch { }
-                throw new InvalidOperationException(message);
-            }
+                title,
+                description = string.IsNullOrWhiteSpace(NewProjectDescription.Text) ? null : NewProjectDescription.Text.Trim()
+            });
             CreateOverlay.Visibility = Visibility.Collapsed;
             await LoadProjectsAsync();
         }
+        catch (ApiException ex) when (ex.Status == 401) { CreateOverlay.Visibility = Visibility.Collapsed; await LogoutAsync(); }
         catch (Exception ex) { CreateError.Text = ex.Message; }
         finally { SubmitCreateProject.IsEnabled = true; }
     }
@@ -198,6 +190,7 @@ public partial class MainWindow : Window
         if (sender is not Button { CommandParameter: string pageName } selected) return;
         foreach (var button in NavigationPanel.Children.OfType<Button>())
             button.Tag = ReferenceEquals(button, selected) ? "Active" : null;
+        ++_navigationVersion;
         PageTitle.Text = pageName;
         var isProjects = pageName == "Проекты";
         CreateProjectButton.Visibility = isProjects ? Visibility.Visible : Visibility.Collapsed;
@@ -216,8 +209,48 @@ public partial class MainWindow : Window
 
     private void ProfileButton_Click(object sender, RoutedEventArgs e)
     {
-        MessageBox.Show("Настройки профиля будут перенесены отдельным этапом.", "Vector",
-            MessageBoxButton.OK, MessageBoxImage.Information);
+        var menu = new ContextMenu
+        {
+            PlacementTarget = ProfileButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Top,
+            Background = new SolidColorBrush(Color.FromRgb(63,45,25)),
+            Foreground = (Brush)FindResource("Brush.SidebarText"),
+            Width = ProfileButton.ActualWidth
+        };
+        menu.Items.Add(new MenuItem { Header = ProfileEmail.Text, IsEnabled = false });
+        var profile = new MenuItem { Header = "Настройки профиля" };
+        profile.Click += (_, _) => MessageBox.Show("Редактирование профиля будет перенесено отдельным этапом.", "Vector");
+        menu.Items.Add(profile);
+        menu.Items.Add(new MenuItem { Header = "Тема — скоро", IsEnabled = false });
+        menu.Items.Add(new MenuItem { Header = "Язык — скоро", IsEnabled = false });
+        menu.Items.Add(new MenuItem { Header = "Помощь — скоро", IsEnabled = false });
+        menu.Items.Add(new Separator());
+        var logout = new MenuItem { Header = "Выйти" };
+        logout.Click += async (_, _) => await LogoutAsync();
+        menu.Items.Add(logout);
+        menu.IsOpen = true;
+    }
+
+    private async Task LogoutAsync()
+    {
+        if (_sessionBusy) { SessionStore.Clear(); _api.Token = null; Close(); return; }
+        SessionStore.Clear();
+        _api.Token = null;
+        ++_navigationVersion;
+        _projects.Clear();
+        ProfileAvatar.Child = ProfileInitial;
+        ProfileAvatar.Background = (Brush)FindResource("Brush.Accent");
+        ProfileInitial.Text = "?";
+        ProfileName.Text = "";
+        ProfileEmail.Text = "";
+        UnreadBadge.Visibility = Visibility.Collapsed;
+        CreateOverlay.Visibility = Visibility.Collapsed;
+        foreach (var button in NavigationPanel.Children.OfType<Button>())
+            button.Tag = Equals(button.CommandParameter, "Проекты") ? "Active" : null;
+        PageTitle.Text = "Проекты";
+        ProjectsItems.Visibility = CreateProjectButton.Visibility = Visibility.Visible;
+        Hide();
+        await InitializeSessionAsync();
     }
 
     private sealed class UserDto
