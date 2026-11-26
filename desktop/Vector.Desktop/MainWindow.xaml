@@ -335,13 +335,13 @@
                     BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="8"
                     HorizontalAlignment="Center" VerticalAlignment="Center">
                 <StackPanel>
-                    <DockPanel Margin="0,0,0,20">
+                    <Grid Margin="0,0,0,20"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <TextBlock Text="Новый проект" FontSize="20" FontWeight="SemiBold"
                                    Foreground="{DynamicResource Brush.Text}"/>
-                        <Button Content="×" DockPanel.Dock="Right" Click="CloseCreateProject_Click"
+                        <Button Content="×" Grid.Column="1" HorizontalAlignment="Right" Click="CloseCreateProject_Click"
                                 Background="Transparent" BorderThickness="0" FontSize="22"
                                 Foreground="{DynamicResource Brush.TextMuted}" Width="32"/>
-                    </DockPanel>
+                    </Grid>
                     <TextBlock Text="Название" FontWeight="SemiBold" FontSize="13"
                                Foreground="{DynamicResource Brush.TextMuted}" Margin="0,0,0,6"/>
                     <TextBox x:Name="NewProjectTitle" Height="38" Padding="12,8" MaxLength="150"
